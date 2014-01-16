@@ -1,0 +1,207 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2013 Tadashi Abe (tadashi.abe@gmail.com)
+# the BSD License: http://www.opensource.org/licenses/bsd-license.php
+
+"""
+git-dump-commit checks git branch where you're at currently
+and dumps all the commits in patch format to "DUMP-COMMIT" directory.
+If your repository is Linux kernel (torvalds/linux-2.6.git),
+it traverses all tags and dumps commits for each kernel version.
+
+Please run at git repository.
+# git-dump-commit
+or
+# git dump-commit
+"""
+
+
+import subprocess
+import os
+import re
+import math
+
+destdir = "DUMP-COMMIT/"
+
+
+class Commit():
+    __slots__ = ('digit', 'count', 'outdir', 'pattern1', 'pattern2',
+                 'pattern3', 'pattern4', 'pattern5', 'pc_name_max')
+
+    def __init__(self, outdir, patchnum):
+        self.digit = int(math.log10(patchnum)+1)
+        self.count = 1
+        self.outdir = outdir
+        self.pattern1 = re.compile(r'^\[PATCH[^]]*\]')
+        self.pattern2 = re.compile(r'[^-a-z.A-Z_0-9]')
+        self.pattern3 = re.compile(r'\.\.\.')
+        self.pattern4 = re.compile(r'\.*$|^-|-$')
+        self.pattern5 = re.compile(r'--*')
+        self.pc_name_max = os.pathconf(outdir, 'PC_NAME_MAX')
+
+    def dump(self, commit_list):
+        # Run 'git show' and get the commit.
+        for commitID in commit_list:
+            proc = subprocess.Popen(['git', 'show', commitID],
+                                    cwd=os.getcwd(),
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE
+                                    )
+            (patch, error) = proc.communicate()
+            if (error):
+                print "Error : " + error
+            # Extract subject
+            name = patch.split('\n')[4].strip()
+            # format the name of patch
+            name = self.pattern1.sub('', name)
+            name = self.pattern2.sub('-', name)
+            name = self.pattern3.sub('.', name)
+            name = self.pattern4.sub('', name)
+            name = self.pattern5.sub('-', name)
+            format = "%0" + str(self.digit) + "d-%s.patch"
+            name = format % (self.count, name)
+            if len(name) > self.pc_name_max:
+                name = name[:self.pc_name_max-6] + ".patch"
+            print name
+            f = file(self.outdir+"/"+name, "w")
+            f.write(patch)
+            f.close()
+            self.count += 1
+
+
+def cmp_linux_kernel(x, y):
+    vermagic = [0, 0]
+    num = 0
+    for n in (x, y):
+        if n.startswith('v2'):      # For v2.6.x
+            version = '2'
+            patchlevel = '06'
+            (head, tail) = n.split('.')[-2:]
+            if '-rc' in tail:
+                (sublevel, extraver) = tail.split('-rc')
+                if len(extraver) == 1:
+                    extraver = '0' + extraver
+            elif '-tree' in tail:   # workaround only for 2.6.11-tree
+                (sublevel, extraver) = ('11', '99')
+            else:
+                (sublevel, extraver) = (tail, '99')
+        elif n.startswith('v3'):    # For v3.x
+            version = '3'
+            sublevel = '00'
+            (head, tail) = n.split('.')
+            if '-rc' in tail:
+                (patchlevel, extraver) = tail.split('-rc')
+                if len(patchlevel) == 1:
+                    patchlevel = '0' + patchlevel
+                if len(extraver) == 1:
+                    extraver = '0' + extraver
+            else:
+                (patchlevel, extraver) = (tail, '99')
+                if len(patchlevel) == 1:
+                    patchlevel = '0' + patchlevel
+        vermagic[num] = int(version + patchlevel + sublevel + extraver)
+        num += 1
+    if vermagic[0] > vermagic[1]:
+        return 1
+    if vermagic[0] < vermagic[1]:
+        return -1
+    else:
+        return 0
+
+
+def get_tag():
+    """Helper to look up linux kernel
+    Verify tags via "git tag" and sort them.
+    """
+    proc = subprocess.Popen(['git', 'tag'],
+                            cwd=os.getcwd(),
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE
+                            )
+    (out, error) = proc.communicate()
+    out = out.split()
+    res = sorted(out, cmp=cmp_linux_kernel)
+    return (res, error)
+
+
+def check_linux_kernel():
+    """traverses linux kernel repository you're in
+    and dumps all the commits of each tag.
+    """
+    (revs, error) = get_tag()
+    if (error):
+        print "Error : " % str(error)
+
+    end = ''
+    for revision in revs:
+        start = end
+        end = revision
+        if start == '':
+            continue
+        if os.path.exists(destdir+end):
+            print "Skipping %s (directory already exists)" % end
+            continue
+        os.mkdir(destdir+end)
+        print "Processing %s..%s" % (start, end)
+
+        pr = subprocess.Popen(['git', 'cherry', start, end],
+                              cwd=os.getcwd(),
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE
+                              )
+        (out, error) = pr.communicate()
+        out = out.split('\n')
+        if len(out) < 10000:
+            patchnum = 1000
+        else:
+            patchnum = len(out)
+        commit = Commit(destdir+end, patchnum)
+        commit_list = []
+        for commitID in out:
+            if commitID.startswith('+ '):
+                # Omit heading "+ "
+                commit_list.append(commitID[2:])
+        commit.dump(commit_list)
+
+
+def check_git_repo():
+    """Dump all the commits of current branch.
+    """
+    proc = subprocess.Popen(['git', 'log', '--pretty=format:%H'],
+                            cwd=os.getcwd(),
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE
+                            )
+    (commit_list, error) = proc.communicate()
+    commit_list = commit_list.split('\n')
+    patchnum = len(commit_list)
+    commit = Commit(destdir, patchnum)
+    commit.dump(commit_list)
+
+
+def main():
+    # Check if you're in git repo.
+    proc = subprocess.Popen(['git', 'remote', '-v'],
+                            cwd=os.getcwd(),
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE
+                            )
+    (repo, error) = proc.communicate()
+    if (error):
+        print error
+        return
+
+    print "Destination directory: %s" % destdir
+    if not os.path.exists(destdir):
+        os.mkdir(destdir)
+
+    if 'torvalds/linux-2.6.git (fetch)' in repo or \
+       'github.com/mirrors/linux.git (fetch)' in repo:
+        check_linux_kernel()
+    else:
+        check_git_repo()
+
+
+if __name__ == "__main__":
+    main()
