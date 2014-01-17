@@ -35,3 +35,13 @@ named each tag name (Like "v3.12-rc8").
 	(...)
 	|-- v3.13-rc6
 	|-- v3.13-rc7
+
+
+Note
+----
+
+git dump-commit can do incremental dump.
+It knows about HEAD commit you extracted the last time.
+When you run git dump-commit next, it starts dump from
+the next commit, with the appropriate numbering of patch
+file.

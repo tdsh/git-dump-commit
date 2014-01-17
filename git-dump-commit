@@ -40,6 +40,23 @@ class Commit():
         self.pattern5 = re.compile(r'--*')
         self.pc_name_max = os.pathconf(outdir, 'PC_NAME_MAX')
 
+    def check_head(self, commit_list):
+        if os.path.exists(destdir + '.gitdump/DUMP_HEAD'):
+            f = file(destdir + '.gitdump/DUMP_HEAD', 'r')
+            last_commit = f.read()
+            (last_commit, last_id) = last_commit.split()
+            f.close()
+            try:
+                index = commit_list.index(last_commit)
+            except:
+                return commit_list
+            self.count = int(last_id) + 1
+            return commit_list[:index]
+        else:
+            # This is first time to run
+            os.mkdir(destdir + '.gitdump')
+            return commit_list
+
     def dump(self, commit_list):
         # Run 'git show' and get the commit.
         for commitID in commit_list:
@@ -68,6 +85,9 @@ class Commit():
             f.write(patch)
             f.close()
             self.count += 1
+        dump_head = file(destdir + '.gitdump/DUMP_HEAD', 'w')
+        dump_head.write('%s\t%d\n' % (commitID, self.count-1))
+        dump_head.close()
 
 
 def cmp_linux_kernel(x, y):
@@ -122,6 +142,7 @@ def get_tag():
     (out, error) = proc.communicate()
     out = out.split()
     res = sorted(out, cmp=cmp_linux_kernel)
+    res.extend(['HEAD'])
     return (res, error)
 
 
@@ -162,6 +183,7 @@ def check_linux_kernel():
             if commitID.startswith('+ '):
                 # Omit heading "+ "
                 commit_list.append(commitID[2:])
+        commit.check_head(commit_list)
         commit.dump(commit_list)
 
 
@@ -176,8 +198,9 @@ def check_git_repo():
     (commit_list, error) = proc.communicate()
     commit_list = commit_list.split('\n')
     patchnum = len(commit_list)
-    commit_list.reverse()
     commit = Commit(destdir, patchnum)
+    commit_list = commit.check_head(commit_list)
+    commit_list.reverse()
     commit.dump(commit_list)
 
 
