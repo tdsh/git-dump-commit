@@ -176,6 +176,7 @@ def check_git_repo():
     (commit_list, error) = proc.communicate()
     commit_list = commit_list.split('\n')
     patchnum = len(commit_list)
+    commit_list.reverse()
     commit = Commit(destdir, patchnum)
     commit.dump(commit_list)
 
