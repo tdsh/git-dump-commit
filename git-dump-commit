@@ -30,26 +30,44 @@ class Commit():
     __slots__ = ('digit', 'count', 'outdir', 'pattern1', 'pattern2',
                  'pattern3', 'pattern4', 'pattern5', 'pc_name_max')
 
-    def __init__(self, outdir, patchnum):
-        self.digit = int(math.log10(patchnum)+1)
+    def __init__(self):
+        self.digit = 0
         self.count = 1
-        self.outdir = outdir
+        self.outdir = ''
         self.pattern1 = re.compile(r'^\[PATCH[^]]*\]')
         self.pattern2 = re.compile(r'[^-a-z.A-Z_0-9]')
         self.pattern3 = re.compile(r'\.\.\.')
         self.pattern4 = re.compile(r'\.*$|^-|-$')
         self.pattern5 = re.compile(r'--*')
-        self.pc_name_max = os.pathconf(outdir, 'PC_NAME_MAX')
+        self.pc_name_max = os.pathconf('/tmp', 'PC_NAME_MAX')
+
+    def config(self, outdir, patchnum):
+        self.digit = int(math.log10(patchnum)+1)
+        self.outdir = outdir
+        self.count = 1
+
+    def get_commit_list(self, *range):
+        cmd_and_args = ['git', 'log', '--no-merges', '--pretty=format:%H']
+        if range:
+            range = range[0] + '..' + range[1]
+            cmd_and_args.append(range)
+        pr = subprocess.Popen(cmd_and_args, cwd=os.getcwd(),
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (commit_list, error) = pr.communicate()
+        commit_list = commit_list.split('\n')
+        if len(commit_list) < 10000:
+            patchnum = 1000
+        else:
+            patchnum = len(commit_list)
+        commit_list.reverse()
+        return (commit_list, patchnum)
 
     def check_head(self, commit_list):
         if os.path.exists(destdir + '.gitdump/DUMP_HEAD'):
-            if not os.path.exists(destdir + 'HEAD'):
-                shutil.rmtree(destdir + '.gitdump')
-                return commit_list
             f = file(destdir + '.gitdump/DUMP_HEAD', 'r')
             last_commit = f.read()
             try:
-                (last_commit, last_id) = last_commit.split()
+                (last_commit, pos) = last_commit.split()
             except:
                 shutil.rmtree(destdir + '.gitdump')
                 return commit_list
@@ -58,12 +76,13 @@ class Commit():
                 index = commit_list.index(last_commit)
             except:
                 return commit_list
-            self.count = int(last_id) + 1
-            return commit_list[:index]
+            pos = int(pos)
+            if pos == len(commit_list):
+                # No new commit exists.
+                return None
+            self.count = int(pos) + 1
+            return commit_list[index+1:]
         else:
-            if os.path.exists(destdir + 'HEAD'):
-                shutil.rmtree(destdir + 'HEAD')
-                os.mkdir(destdir + 'HEAD')
             # This is first time to run
             if not os.path.exists(destdir + '.gitdump'):
                 os.mkdir(destdir + '.gitdump')
@@ -169,7 +188,12 @@ def check_linux_kernel():
     if (error):
         print "Error : " % str(error)
 
+    if not os.path.exists(destdir + '.gitdump/DUMP_HEAD'):
+        if os.path.exists(destdir + 'HEAD'):
+            shutil.rmtree(destdir + 'HEAD')
+
     end = ''
+    commit = Commit()
     for revision in revs:
         start = end
         end = revision
@@ -178,46 +202,25 @@ def check_linux_kernel():
         if end != 'HEAD' and os.path.exists(destdir+end):
             print "Skipping %s (directory already exists)" % end
             continue
-        if end != 'HEAD':
+        if not os.path.exists(destdir+end):
             os.mkdir(destdir+end)
         print "Processing %s..%s" % (start, end)
-
-        pr = subprocess.Popen(['git', 'cherry', start, end],
-                              cwd=os.getcwd(),
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE
-                              )
-        (out, error) = pr.communicate()
-        out = out.split('\n')
-        if len(out) < 10000:
-            patchnum = 1000
-        else:
-            patchnum = len(out)
-        commit = Commit(destdir+end, patchnum)
-        commit_list = []
-        for commitID in out:
-            if commitID.startswith('+ '):
-                # Omit heading "+ "
-                commit_list.append(commitID[2:])
-        commit.check_head(commit_list)
-        commit.dump(commit_list)
+        (commit_list, patchnum) = commit.get_commit_list(start, end)
+        commit.config(destdir+end, patchnum)
+        commit_list = commit.check_head(commit_list)
+        if commit_list:
+            commit.dump(commit_list)
 
 
 def check_git_repo():
     """Dump all the commits of current branch.
     """
-    proc = subprocess.Popen(['git', 'log', '--pretty=format:%H'],
-                            cwd=os.getcwd(),
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE
-                            )
-    (commit_list, error) = proc.communicate()
-    commit_list = commit_list.split('\n')
-    patchnum = len(commit_list)
-    commit = Commit(destdir, patchnum)
+    commit = Commit()
+    (commit_list, patchnum) = commit.get_commit_list()
+    commit.config(destdir, patchnum)
     commit_list = commit.check_head(commit_list)
-    commit_list.reverse()
-    commit.dump(commit_list)
+    if commit_list:
+        commit.dump(commit_list)
 
 
 def main():
