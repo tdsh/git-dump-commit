@@ -21,6 +21,7 @@ import subprocess
 import os
 import re
 import math
+import shutil
 
 destdir = "DUMP-COMMIT/"
 
@@ -42,9 +43,16 @@ class Commit():
 
     def check_head(self, commit_list):
         if os.path.exists(destdir + '.gitdump/DUMP_HEAD'):
+            if not os.path.exists(destdir + 'HEAD'):
+                shutil.rmtree(destdir + '.gitdump')
+                return commit_list
             f = file(destdir + '.gitdump/DUMP_HEAD', 'r')
             last_commit = f.read()
-            (last_commit, last_id) = last_commit.split()
+            try:
+                (last_commit, last_id) = last_commit.split()
+            except:
+                shutil.rmtree(destdir + '.gitdump')
+                return commit_list
             f.close()
             try:
                 index = commit_list.index(last_commit)
@@ -53,11 +61,16 @@ class Commit():
             self.count = int(last_id) + 1
             return commit_list[:index]
         else:
+            if os.path.exists(destdir + 'HEAD'):
+                shutil.rmtree(destdir + 'HEAD')
+                os.mkdir(destdir + 'HEAD')
             # This is first time to run
-            os.mkdir(destdir + '.gitdump')
+            if not os.path.exists(destdir + '.gitdump'):
+                os.mkdir(destdir + '.gitdump')
             return commit_list
 
     def dump(self, commit_list):
+        commitID = ''
         # Run 'git show' and get the commit.
         for commitID in commit_list:
             proc = subprocess.Popen(['git', 'show', commitID],
@@ -85,6 +98,8 @@ class Commit():
             f.write(patch)
             f.close()
             self.count += 1
+        if commitID == '':
+            return
         dump_head = file(destdir + '.gitdump/DUMP_HEAD', 'w')
         dump_head.write('%s\t%d\n' % (commitID, self.count-1))
         dump_head.close()
@@ -160,10 +175,11 @@ def check_linux_kernel():
         end = revision
         if start == '':
             continue
-        if os.path.exists(destdir+end):
+        if end != 'HEAD' and os.path.exists(destdir+end):
             print "Skipping %s (directory already exists)" % end
             continue
-        os.mkdir(destdir+end)
+        if end != 'HEAD':
+            os.mkdir(destdir+end)
         print "Processing %s..%s" % (start, end)
 
         pr = subprocess.Popen(['git', 'cherry', start, end],
