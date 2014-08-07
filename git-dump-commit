@@ -126,36 +126,27 @@ class Commit(object):
 
 def cmp_linux_kernel(x, y):
     vermagic = [0, 0]
-    num = 0
-    for n in (x, y):
-        if n.startswith('v2'):      # For v2.6.x
+    for index, n in enumerate([x, y]):
+        (head, tail) = n.rsplit('.', 1)
+        if head == 'v2.6':
             version = '2'
             patchlevel = '06'
-            (head, tail) = n.split('.')[-2:]
-            if '-rc' in tail:
-                (sublevel, extraver) = tail.split('-rc')
-                if len(extraver) == 1:
-                    extraver = '0' + extraver
-            elif '-tree' in tail:   # workaround only for 2.6.11-tree
-                (sublevel, extraver) = ('11', '99')
-            else:
-                (sublevel, extraver) = (tail, '99')
-        elif n.startswith('v3'):    # For v3.x
+        elif head == 'v3':
             version = '3'
             sublevel = '00'
-            (head, tail) = n.split('.')
-            if '-rc' in tail:
-                (patchlevel, extraver) = tail.split('-rc')
-                if len(patchlevel) == 1:
-                    patchlevel = '0' + patchlevel
-                if len(extraver) == 1:
-                    extraver = '0' + extraver
-            else:
-                (patchlevel, extraver) = (tail, '99')
-                if len(patchlevel) == 1:
-                    patchlevel = '0' + patchlevel
-        vermagic[num] = int(version + patchlevel + sublevel + extraver)
-        num += 1
+
+        if '-rc' in tail:
+            (first, second) = ['{0:>02}'.format(i) for i in tail.split('-rc')]
+        elif '-tree' in tail:   # workaround for 2.6.11-tree
+            (first, second) = ('11', '99')
+        else:
+            (first, second) = (tail, '99')
+        if version == '2':
+            (sublevel, extraver) = (first, second)
+        elif version == '3':
+            (patchlevel, extraver) = (first, second)
+        vermagic[index] = int(version + patchlevel + sublevel + extraver)
+
     if vermagic[0] > vermagic[1]:
         return 1
     if vermagic[0] < vermagic[1]:
