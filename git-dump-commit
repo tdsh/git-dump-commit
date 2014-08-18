@@ -23,7 +23,7 @@ import re
 import math
 import shutil
 
-destdir = "DUMP-COMMIT/"
+destdir = "DUMP-COMMIT"
 
 
 class Commit(object):
@@ -42,7 +42,7 @@ class Commit(object):
         self.pc_name_max = os.pathconf('/tmp', 'PC_NAME_MAX')
 
     def config(self, outdir, patchnum):
-        self.digit = int(math.log10(patchnum)+1)
+        self.digit = int(math.log10(patchnum) + 1)
         self.outdir = outdir
         self.count = 1
 
@@ -63,15 +63,15 @@ class Commit(object):
         return (commit_list, patchnum)
 
     def check_head(self, commit_list):
-        if os.path.exists(destdir + '.gitdump/DUMP_HEAD'):
-            f = file(destdir + '.gitdump/DUMP_HEAD', 'r')
-            last_commit = f.read()
+        if os.path.exists(os.path.join(destdir, '.gitdump', 'DUMP_HEAD')):
+            with open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'),
+                      'r') as f:
+                last_commit = f.read()
             try:
                 (last_commit, pos) = last_commit.split()
             except:
-                shutil.rmtree(destdir + '.gitdump')
+                shutil.rmtree(os.path.join(destdir, '.gitdump'))
                 return commit_list
-            f.close()
             try:
                 index = commit_list.index(last_commit)
             except:
@@ -81,11 +81,11 @@ class Commit(object):
                 # No new commit exists.
                 return None
             self.count = int(pos) + 1
-            return commit_list[index+1:]
+            return commit_list[index + 1:]
         else:
             # This is first time to run
-            if not os.path.exists(destdir + '.gitdump'):
-                os.mkdir(destdir + '.gitdump')
+            if not os.path.exists(os.path.join(destdir, '.gitdump')):
+                os.mkdir(os.path.join(destdir, '.gitdump'))
             return commit_list
 
     def dump(self, commit_list):
@@ -111,17 +111,16 @@ class Commit(object):
             format = "%0" + str(self.digit) + "d-%s.patch"
             name = format % (self.count, name)
             if len(name) > self.pc_name_max:
-                name = name[:self.pc_name_max-6] + ".patch"
+                name = name[:self.pc_name_max - 6] + ".patch"
             print name
-            f = file(self.outdir+"/"+name, "w")
-            f.write(patch)
-            f.close()
+            with open(os.path.join(self.outdir, name), "w") as f:
+                f.write(patch)
             self.count += 1
         if commitID == '':
             return
-        dump_head = file(destdir + '.gitdump/DUMP_HEAD', 'w')
-        dump_head.write('%s\t%d\n' % (commitID, self.count-1))
-        dump_head.close()
+        with open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'),
+                  'w') as dump_head:
+            dump_head.write('%s\t%d\n' % (commitID, self.count - 1))
 
 
 def cmp_linux_kernel(x, y):
@@ -179,9 +178,9 @@ def check_linux_kernel():
     if (error):
         print "Error : " % str(error)
 
-    if not os.path.exists(destdir + '.gitdump/DUMP_HEAD'):
-        if os.path.exists(destdir + 'HEAD'):
-            shutil.rmtree(destdir + 'HEAD')
+    if not os.path.exists(os.path.join(destdir, '.gitdump', 'DUMP_HEAD')):
+        if os.path.exists(os.path.join(destdir, 'HEAD')):
+            shutil.rmtree(os.path.join(destdir, 'HEAD'))
 
     end = ''
     commit = Commit()
@@ -190,14 +189,14 @@ def check_linux_kernel():
         end = revision
         if start == '':
             continue
-        if end != 'HEAD' and os.path.exists(destdir+end):
+        if end != 'HEAD' and os.path.exists(os.path.join(destdir, end)):
             print "Skipping %s (directory already exists)" % end
             continue
-        if not os.path.exists(destdir+end):
-            os.mkdir(destdir+end)
+        if not os.path.exists(os.path.join(destdir, end)):
+            os.mkdir(os.path.join(destdir, end))
         print "Processing %s..%s" % (start, end)
         (commit_list, patchnum) = commit.get_commit_list(start, end)
-        commit.config(destdir+end, patchnum)
+        commit.config(os.path.join(destdir, end), patchnum)
         commit_list = commit.check_head(commit_list)
         if commit_list:
             commit.dump(commit_list)
