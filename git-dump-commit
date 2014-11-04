@@ -46,11 +46,11 @@ class Commit(object):
         self.outdir = outdir
         self.count = 1
 
-    def get_commit_list(self, *range):
+    def get_commit_list(self, *versions):
         cmd_and_args = ['git', 'log', '--no-merges', '--pretty=format:%H']
-        if range:
-            range = range[0] + '..' + range[1]
-            cmd_and_args.append(range)
+        if versions:
+            scope = versions[0] + '..' + versions[1]
+            cmd_and_args.append(scope)
         pr = subprocess.Popen(cmd_and_args, cwd=os.getcwd(),
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (commit_list, error) = pr.communicate()
@@ -108,8 +108,8 @@ class Commit(object):
             name = self.pattern3.sub('.', name)
             name = self.pattern4.sub('', name)
             name = self.pattern5.sub('-', name)
-            format = "%0" + str(self.digit) + "d-%s.patch"
-            name = format % (self.count, name)
+            template = "%0" + str(self.digit) + "d-%s.patch"
+            name = template % (self.count, name)
             if len(name) > self.pc_name_max:
                 name = name[:self.pc_name_max - 6] + ".patch"
             print name
@@ -176,7 +176,7 @@ def check_linux_kernel():
     """
     (revs, error) = get_tag()
     if (error):
-        print "Error : " % str(error)
+        print 'Error : {0}'.format(str(error))
 
     if not os.path.exists(os.path.join(destdir, '.gitdump', 'DUMP_HEAD')):
         if os.path.exists(os.path.join(destdir, 'HEAD')):
