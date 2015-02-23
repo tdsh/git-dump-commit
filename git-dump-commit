@@ -139,7 +139,7 @@ def cmp_linux_kernel(x, y):
         elif '-tree' in tail:   # workaround for 2.6.11-tree
             (first, second) = ('11', '99')
         else:
-            (first, second) = (tail, '99')
+            (first, second) = ['{0:>02}'.format(i) for i in [tail, '99']]
         if version == '2':
             (sublevel, extraver) = (first, second)
         elif version == '3':
