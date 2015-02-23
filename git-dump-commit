@@ -198,7 +198,7 @@ def check_linux_kernel():
         (commit_list, patchnum) = commit.get_commit_list(start, end)
         commit.config(os.path.join(destdir, end), patchnum)
         commit_list = commit.check_head(commit_list)
-        if commit_list:
+        if commit_list[0] != '':
             commit.dump(commit_list)
 
 
