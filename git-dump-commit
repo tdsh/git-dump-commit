@@ -130,8 +130,8 @@ def cmp_linux_kernel(x, y):
         if head == 'v2.6':
             version = '2'
             patchlevel = '06'
-        elif head == 'v3':
-            version = '3'
+        else:   # v3.x or v4.x
+            version = head.replace('v', '')
             sublevel = '00'
 
         if '-rc' in tail:
@@ -142,7 +142,7 @@ def cmp_linux_kernel(x, y):
             (first, second) = ['{0:>02}'.format(i) for i in [tail, '99']]
         if version == '2':
             (sublevel, extraver) = (first, second)
-        elif version == '3':
+        else:   # v3.x or v4.x
             (patchlevel, extraver) = (first, second)
         vermagic[index] = int(version + patchlevel + sublevel + extraver)
 
