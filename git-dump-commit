@@ -22,6 +22,7 @@ import os
 import re
 import math
 import shutil
+import fnmatch
 
 destdir = "DUMP-COMMIT"
 
@@ -63,30 +64,67 @@ class Commit(object):
         return (commit_list, patchnum)
 
     def check_head(self, commit_list):
-        if os.path.exists(os.path.join(destdir, '.gitdump', 'DUMP_HEAD')):
-            with open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'),
-                      'r') as f:
-                last_commit = f.read()
-            try:
-                (last_commit, pos) = last_commit.split()
-            except:
+        if not os.path.exists(os.path.join(destdir, 'HEAD')):
+            if os.path.exists(os.path.join(destdir, '.gitdump')):
                 shutil.rmtree(os.path.join(destdir, '.gitdump'))
-                return commit_list
-            try:
-                index = commit_list.index(last_commit)
-            except:
-                return commit_list
-            pos = int(pos)
-            if pos == len(commit_list):
-                # No new commit exists.
-                return None
-            self.count = int(pos) + 1
-            return commit_list[index + 1:]
-        else:
-            # This is first time to run
-            if not os.path.exists(os.path.join(destdir, '.gitdump')):
                 os.mkdir(os.path.join(destdir, '.gitdump'))
+            os.mkdir(os.path.join(destdir, 'HEAD'))
             return commit_list
+        elif not os.path.exists(os.path.join(destdir, '.gitdump')):
+            if os.path.exists(os.path.join(destdir, 'HEAD')):
+                shutil.rmtree(os.path.join(destdir, 'HEAD'))
+                os.mkdir(os.path.join(destdir, 'HEAD'))
+            os.mkdir(os.path.join(destdir, '.gitdump'))
+            return commit_list
+
+        try:
+            f = open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'), 'r')
+            last_commit = f.read()
+            f.close()
+            (last_commit, pos) = last_commit.split()
+        except:
+            shutil.rmtree(os.path.join(destdir, '.gitdump'))
+            os.mkdir(os.path.join(destdir, '.gitdump'))
+            shutil.rmtree(os.path.join(destdir, 'HEAD'))
+            os.mkdir(os.path.join(destdir, 'HEAD'))
+            return commit_list
+
+        # check for the actual patch file
+        files = os.listdir(os.path.join(destdir, 'HEAD'))
+        patch = []
+        patch = fnmatch.filter(files, '{0}-*'.format(pos))
+        # Is there any better way?
+        if patch == []:
+            patch = fnmatch.filter(files, '0{0}-*'.format(pos))
+            if patch == []:
+                patch = fnmatch.filter(files, '00{0}-*'.format(pos))
+                if patch == []:
+                    patch = fnmatch.filter(files, '000{0}-*'.format(pos))
+                    if patch == []:
+                        patch = fnmatch.filter(files, '0000{0}-*'.format(pos))
+        if patch == []:
+            # Not found.
+            shutil.rmtree(os.path.join(destdir, '.gitdump'))
+            os.mkdir(os.path.join(destdir, '.gitdump'))
+            shutil.rmtree(os.path.join(destdir, 'HEAD'))
+            os.mkdir(os.path.join(destdir, 'HEAD'))
+            return commit_list
+
+        with open(os.path.join(destdir, 'HEAD', patch[0]), 'r') as f:
+            commit = f.readline().strip().split()[1]
+        if commit != last_commit:
+            return commit_list
+
+        try:
+            index = commit_list.index(last_commit)
+        except:
+            return commit_list
+        pos = int(pos)
+        if pos == len(commit_list):
+            # No new commit exists.
+            return []
+        self.count = int(pos) + 1
+        return commit_list[index + 1:]
 
     def dump(self, commit_list):
         commitID = ''
@@ -193,10 +231,6 @@ def check_linux_kernel():
     if (error):
         print 'Error : {0}'.format(str(error))
 
-    if not os.path.exists(os.path.join(destdir, '.gitdump', 'DUMP_HEAD')):
-        if os.path.exists(os.path.join(destdir, 'HEAD')):
-            shutil.rmtree(os.path.join(destdir, 'HEAD'))
-
     end = ''
     commit = Commit()
     for revision in revs:
@@ -212,7 +246,8 @@ def check_linux_kernel():
         (commit_list, patchnum) = commit.get_commit_list(start, end)
         commit.config(outdir, patchnum)
         commit_list = commit.check_head(commit_list)
-        if commit_list[0] != '':
+        #if commit_list[0] != '':
+        if commit_list != []:
             commit.dump(commit_list)
 
 
