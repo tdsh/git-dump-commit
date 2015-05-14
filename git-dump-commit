@@ -170,6 +170,21 @@ def get_tag():
     return (res, error)
 
 
+def prepare_dir(tag):
+    done = False
+    if tag == 'HEAD':
+        return (done, '{0}/{1}'.format(destdir, tag))
+    version = tag.split('-')[0]
+    outdir = '{0}/{1}/{2}'.format(destdir, version, tag)
+    if not os.path.exists('{0}/{1}'.format(destdir, version)):
+        os.makedirs(outdir)
+    elif not os.path.exists(outdir):
+        os.mkdir(outdir)
+    else:
+        done = True
+    return (done, outdir)
+
+
 def check_linux_kernel():
     """traverses linux kernel repository you're in
     and dumps all the commits of each tag.
@@ -189,14 +204,13 @@ def check_linux_kernel():
         end = revision
         if start == '':
             continue
-        if end != 'HEAD' and os.path.exists(os.path.join(destdir, end)):
+        (done, outdir) = prepare_dir(end)
+        if done:
             print "Skipping %s (directory already exists)" % end
             continue
-        if not os.path.exists(os.path.join(destdir, end)):
-            os.mkdir(os.path.join(destdir, end))
         print "Processing %s..%s" % (start, end)
         (commit_list, patchnum) = commit.get_commit_list(start, end)
-        commit.config(os.path.join(destdir, end), patchnum)
+        commit.config(outdir, patchnum)
         commit_list = commit.check_head(commit_list)
         if commit_list[0] != '':
             commit.dump(commit_list)
