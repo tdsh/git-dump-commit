@@ -47,84 +47,8 @@ class Commit(object):
         self.outdir = outdir
         self.count = 1
 
-    def get_commit_list(self, *versions):
-        cmd_and_args = ['git', 'log', '--no-merges', '--pretty=format:%H']
-        if versions:
-            scope = versions[0] + '..' + versions[1]
-            cmd_and_args.append(scope)
-        pr = subprocess.Popen(cmd_and_args, cwd=os.getcwd(),
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        (commit_list, error) = pr.communicate()
-        commit_list = commit_list.split('\n')
-        if len(commit_list) < 10000:
-            patchnum = 1000
-        else:
-            patchnum = len(commit_list)
-        commit_list.reverse()
-        return (commit_list, patchnum)
-
-    def check_head(self, commit_list):
-        if not os.path.exists(os.path.join(destdir, 'HEAD')):
-            if os.path.exists(os.path.join(destdir, '.gitdump')):
-                shutil.rmtree(os.path.join(destdir, '.gitdump'))
-                os.mkdir(os.path.join(destdir, '.gitdump'))
-            os.mkdir(os.path.join(destdir, 'HEAD'))
-            return commit_list
-        elif not os.path.exists(os.path.join(destdir, '.gitdump')):
-            if os.path.exists(os.path.join(destdir, 'HEAD')):
-                shutil.rmtree(os.path.join(destdir, 'HEAD'))
-                os.mkdir(os.path.join(destdir, 'HEAD'))
-            os.mkdir(os.path.join(destdir, '.gitdump'))
-            return commit_list
-
-        try:
-            f = open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'), 'r')
-            last_commit = f.read()
-            f.close()
-            (last_commit, pos) = last_commit.split()
-        except:
-            shutil.rmtree(os.path.join(destdir, '.gitdump'))
-            os.mkdir(os.path.join(destdir, '.gitdump'))
-            shutil.rmtree(os.path.join(destdir, 'HEAD'))
-            os.mkdir(os.path.join(destdir, 'HEAD'))
-            return commit_list
-
-        # check for the actual patch file
-        files = os.listdir(os.path.join(destdir, 'HEAD'))
-        patch = []
-        patch = fnmatch.filter(files, '{0}-*'.format(pos))
-        # Is there any better way?
-        if patch == []:
-            patch = fnmatch.filter(files, '0{0}-*'.format(pos))
-            if patch == []:
-                patch = fnmatch.filter(files, '00{0}-*'.format(pos))
-                if patch == []:
-                    patch = fnmatch.filter(files, '000{0}-*'.format(pos))
-                    if patch == []:
-                        patch = fnmatch.filter(files, '0000{0}-*'.format(pos))
-        if patch == []:
-            # Not found.
-            shutil.rmtree(os.path.join(destdir, '.gitdump'))
-            os.mkdir(os.path.join(destdir, '.gitdump'))
-            shutil.rmtree(os.path.join(destdir, 'HEAD'))
-            os.mkdir(os.path.join(destdir, 'HEAD'))
-            return commit_list
-
-        with open(os.path.join(destdir, 'HEAD', patch[0]), 'r') as f:
-            commit = f.readline().strip().split()[1]
-        if commit != last_commit:
-            return commit_list
-
-        try:
-            index = commit_list.index(last_commit)
-        except:
-            return commit_list
-        pos = int(pos)
-        if pos == len(commit_list):
-            # No new commit exists.
-            return []
-        self.count = int(pos) + 1
-        return commit_list[index + 1:]
+    def update_count(self, count):
+        self.count = count
 
     def dump(self, commit_list):
         commitID = ''
@@ -208,6 +132,23 @@ def get_tag():
     return (res, error)
 
 
+def get_commit_list(*versions):
+    cmd_and_args = ['git', 'log', '--no-merges', '--pretty=format:%H']
+    if versions:
+        scope = versions[0] + '..' + versions[1]
+        cmd_and_args.append(scope)
+    pr = subprocess.Popen(cmd_and_args, cwd=os.getcwd(),
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (commit_list, error) = pr.communicate()
+    commit_list = commit_list.split('\n')
+    if len(commit_list) < 10000:
+        patchnum = 1000
+    else:
+        patchnum = len(commit_list)
+    commit_list.reverse()
+    return (commit_list, patchnum)
+
+
 def prepare_dir(tag):
     done = False
     if tag == 'HEAD':
@@ -221,6 +162,71 @@ def prepare_dir(tag):
     else:
         done = True
     return (done, outdir)
+
+
+def check_head(commit_list):
+    if not os.path.exists(os.path.join(destdir, 'HEAD')):
+        if os.path.exists(os.path.join(destdir, '.gitdump')):
+            shutil.rmtree(os.path.join(destdir, '.gitdump'))
+            os.mkdir(os.path.join(destdir, '.gitdump'))
+        os.mkdir(os.path.join(destdir, 'HEAD'))
+        return (commit_list, None)
+    elif not os.path.exists(os.path.join(destdir, '.gitdump')):
+        if os.path.exists(os.path.join(destdir, 'HEAD')):
+            shutil.rmtree(os.path.join(destdir, 'HEAD'))
+            os.mkdir(os.path.join(destdir, 'HEAD'))
+        os.mkdir(os.path.join(destdir, '.gitdump'))
+        return (commit_list, None)
+
+    try:
+        f = open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'), 'r')
+        last_commit = f.read()
+        f.close()
+        (last_commit, pos) = last_commit.split()
+    except:
+        shutil.rmtree(os.path.join(destdir, '.gitdump'))
+        os.mkdir(os.path.join(destdir, '.gitdump'))
+        shutil.rmtree(os.path.join(destdir, 'HEAD'))
+        os.mkdir(os.path.join(destdir, 'HEAD'))
+        return (commit_list, None)
+
+    # check for the actual patch file
+    files = os.listdir(os.path.join(destdir, 'HEAD'))
+    patch = []
+    patch = fnmatch.filter(files, '{0}-*'.format(pos))
+    # Is there any better way?
+    if patch == []:
+        patch = fnmatch.filter(files, '0{0}-*'.format(pos))
+        if patch == []:
+            patch = fnmatch.filter(files, '00{0}-*'.format(pos))
+            if patch == []:
+                patch = fnmatch.filter(files, '000{0}-*'.format(pos))
+                if patch == []:
+                    patch = fnmatch.filter(files, '0000{0}-*'.format(pos))
+    if patch == []:
+        # Not found.
+        shutil.rmtree(os.path.join(destdir, '.gitdump'))
+        os.mkdir(os.path.join(destdir, '.gitdump'))
+        shutil.rmtree(os.path.join(destdir, 'HEAD'))
+        os.mkdir(os.path.join(destdir, 'HEAD'))
+        return (commit_list, None)
+
+    with open(os.path.join(destdir, 'HEAD', patch[0]), 'r') as f:
+        commit = f.readline().strip().split()[1]
+    if commit != last_commit:
+        return (commit_list, None)
+
+    try:
+        index = commit_list.index(last_commit)
+    except:
+        return (commit_list, None)
+    pos = int(pos)
+    if pos == len(commit_list):
+        # No new commit exists.
+        return ([], None)
+    #self.count = int(pos) + 1
+    count = int(pos) + 1
+    return (commit_list[index + 1:], count)
 
 
 def check_linux_kernel():
@@ -243,9 +249,11 @@ def check_linux_kernel():
             print "Skipping %s (directory already exists)" % end
             continue
         print "Processing %s..%s" % (start, end)
-        (commit_list, patchnum) = commit.get_commit_list(start, end)
+        (commit_list, patchnum) = get_commit_list(start, end)
         commit.config(outdir, patchnum)
-        commit_list = commit.check_head(commit_list)
+        (commit_list, count) = check_head(commit_list)
+        if count:
+            commit.update_count(count)
         #if commit_list[0] != '':
         if commit_list != []:
             commit.dump(commit_list)
@@ -255,9 +263,11 @@ def check_git_repo():
     """Dump all the commits of current branch.
     """
     commit = Commit()
-    (commit_list, patchnum) = commit.get_commit_list()
+    (commit_list, patchnum) = get_commit_list()
     commit.config(destdir, patchnum)
-    commit_list = commit.check_head(commit_list)
+    (commit_list, count) = check_head(commit_list)
+    if count:
+        commit.update_count(count)
     if commit_list:
         commit.dump(commit_list)
 
