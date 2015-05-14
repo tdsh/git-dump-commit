@@ -254,7 +254,6 @@ def check_linux_kernel():
         (commit_list, count) = check_head(commit_list)
         if count:
             commit.update_count(count)
-        #if commit_list[0] != '':
         if commit_list != []:
             commit.dump(commit_list)
 
@@ -268,7 +267,7 @@ def check_git_repo():
     (commit_list, count) = check_head(commit_list)
     if count:
         commit.update_count(count)
-    if commit_list:
+    if commit_list != []:
         commit.dump(commit_list)
 
 
