@@ -169,17 +169,17 @@ def prepare_dir(tag):
     return (done, outdir)
 
 
-def check_head(commit_list):
-    if not os.path.exists(os.path.join(destdir, 'HEAD')):
+def check_head(commit_list, head_dir):
+    if not os.path.exists(head_dir):
         if os.path.exists(os.path.join(destdir, '.gitdump')):
             shutil.rmtree(os.path.join(destdir, '.gitdump'))
+        os.mkdir(head_dir)
         os.mkdir(os.path.join(destdir, '.gitdump'))
-        os.mkdir(os.path.join(destdir, 'HEAD'))
         return (commit_list, None)
     elif not os.path.exists(os.path.join(destdir, '.gitdump')):
-        if os.path.exists(os.path.join(destdir, 'HEAD')):
-            shutil.rmtree(os.path.join(destdir, 'HEAD'))
-        os.mkdir(os.path.join(destdir, 'HEAD'))
+        if os.path.exists(head_dir):
+            shutil.rmtree(head_dir)
+        os.mkdir(head_dir)
         os.mkdir(os.path.join(destdir, '.gitdump'))
         return (commit_list, None)
 
@@ -191,12 +191,12 @@ def check_head(commit_list):
     except:
         shutil.rmtree(os.path.join(destdir, '.gitdump'))
         os.mkdir(os.path.join(destdir, '.gitdump'))
-        shutil.rmtree(os.path.join(destdir, 'HEAD'))
-        os.mkdir(os.path.join(destdir, 'HEAD'))
+        shutil.rmtree(head_dir)
+        os.mkdir(head_dir)
         return (commit_list, None)
 
     # check for the actual patch file
-    files = os.listdir(os.path.join(destdir, 'HEAD'))
+    files = os.listdir(head_dir)
     patch = []
     patch = fnmatch.filter(files, '{0}-*'.format(pos))
     # Is there any better way?
@@ -212,11 +212,11 @@ def check_head(commit_list):
         # Not found.
         shutil.rmtree(os.path.join(destdir, '.gitdump'))
         os.mkdir(os.path.join(destdir, '.gitdump'))
-        shutil.rmtree(os.path.join(destdir, 'HEAD'))
-        os.mkdir(os.path.join(destdir, 'HEAD'))
+        shutil.rmtree(head_dir)
+        os.mkdir(head_dir)
         return (commit_list, None)
 
-    with open(os.path.join(destdir, 'HEAD', patch[0]), 'r') as f:
+    with open(os.path.join(head_dir, patch[0]), 'r') as f:
         commit = f.readline().strip().split()[1]
     if commit != last_commit:
         return (commit_list, None)
@@ -257,7 +257,8 @@ def check_linux_kernel():
         print "Processing %s..%s" % (start, end)
         (commit_list, patchnum) = get_commit_list(start, end)
         commit.config(outdir, patchnum)
-        (commit_list, count) = check_head(commit_list)
+        (commit_list, count) = check_head(commit_list,
+                                          os.path.join(destdir, 'HEAD'))
         if count:
             commit.update_count(count)
         if commit_list != []:
@@ -270,8 +271,7 @@ def check_git_repo():
     commit = Commit()
     (commit_list, patchnum) = get_commit_list()
     commit.config(destdir, patchnum)
-    (commit_list, count) = check_head(commit_list)
-    os.rmdir(os.path.join(destdir, 'HEAD'))
+    (commit_list, count) = check_head(commit_list, destdir)
     if count:
         commit.update_count(count)
     if commit_list != []:
