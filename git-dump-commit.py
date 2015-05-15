@@ -19,6 +19,7 @@ or
 
 import subprocess
 import os
+import sys
 import re
 import math
 import shutil
@@ -61,7 +62,8 @@ class Commit(object):
                                     )
             (patch, error) = proc.communicate()
             if (error):
-                print "Error : " + error
+                sys.stderr.write('git dump-commit: {0}\n'.format(error))
+                sys.exit(1)
             # Extract subject
             name = patch.split('\n')[4].strip()
             # format the name of patch
@@ -140,6 +142,9 @@ def get_commit_list(*versions):
     pr = subprocess.Popen(cmd_and_args, cwd=os.getcwd(),
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     (commit_list, error) = pr.communicate()
+    if error:
+        sys.stderr.write('git dump-commit: {0}\n'.format(error))
+        sys.exit(1)
     commit_list = commit_list.split('\n')
     if len(commit_list) < 10000:
         patchnum = 1000
@@ -235,7 +240,8 @@ def check_linux_kernel():
     """
     (revs, error) = get_tag()
     if (error):
-        print 'Error : {0}'.format(str(error))
+        sys.stderr.write('git dump-commit: {0}\n'.format(error))
+        sys.exit(1)
 
     end = ''
     commit = Commit()
@@ -280,8 +286,8 @@ def main():
                             )
     (repo, error) = proc.communicate()
     if (error):
-        print error
-        return
+        sys.stderr.write('git dump-commit: {0}\n'.format(error))
+        sys.exit(1)
 
     print "Destination directory: %s" % destdir
     if not os.path.exists(destdir):
