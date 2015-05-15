@@ -169,7 +169,7 @@ def prepare_dir(tag):
     return (done, outdir)
 
 
-def check_head(commit_list, head_dir):
+def check_head(commit_list, head_dir, latest_tag=''):
     if not os.path.exists(head_dir):
         if os.path.exists(os.path.join(destdir, '.gitdump')):
             shutil.rmtree(os.path.join(destdir, '.gitdump'))
@@ -194,6 +194,22 @@ def check_head(commit_list, head_dir):
         shutil.rmtree(head_dir)
         os.mkdir(head_dir)
         return (commit_list, None)
+
+    # handling HEAD when new tag is added.
+    if latest_tag != '':
+        try:
+            with open(os.path.join(destdir, '.gitdump', 'latest_tag'), 'r') as f:
+                current_tag = f.read().strip()
+            if current_tag != latest_tag:
+                raise Exception('New tag was added')
+        except:
+            shutil.rmtree(os.path.join(destdir, '.gitdump'))
+            os.mkdir(os.path.join(destdir, '.gitdump'))
+            shutil.rmtree(head_dir)
+            os.mkdir(head_dir)
+            with open(os.path.join(destdir, '.gitdump', 'latest_tag'), 'w') as f:
+                f.write(latest_tag)
+            return (commit_list, None)
 
     # check for the actual patch file
     files = os.listdir(head_dir)
@@ -243,6 +259,7 @@ def check_linux_kernel():
         sys.stderr.write('git dump-commit: {0}\n'.format(error))
         sys.exit(1)
 
+    latest_tag = revs[-2]
     end = ''
     commit = Commit()
     for revision in revs:
@@ -258,7 +275,8 @@ def check_linux_kernel():
         (commit_list, patchnum) = get_commit_list(start, end)
         commit.config(outdir, patchnum)
         (commit_list, count) = check_head(commit_list,
-                                          os.path.join(destdir, 'HEAD'))
+                                          os.path.join(destdir, 'HEAD'),
+                                          latest_tag)
         if count:
             commit.update_count(count)
         if commit_list != []:
