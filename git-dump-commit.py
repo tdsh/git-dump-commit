@@ -246,7 +246,7 @@ def check_linux_kernel():
             continue
         (done, outdir) = prepare_dir(end)
         if done:
-            print "Skipping %s (directory already exists)" % end
+            print("Skipping {0:12s} (directory already exists)".format(end))
             continue
         print "Processing %s..%s" % (start, end)
         (commit_list, patchnum) = get_commit_list(start, end)
