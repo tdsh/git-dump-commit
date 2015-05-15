@@ -173,13 +173,13 @@ def check_head(commit_list):
     if not os.path.exists(os.path.join(destdir, 'HEAD')):
         if os.path.exists(os.path.join(destdir, '.gitdump')):
             shutil.rmtree(os.path.join(destdir, '.gitdump'))
-            os.mkdir(os.path.join(destdir, '.gitdump'))
+        os.mkdir(os.path.join(destdir, '.gitdump'))
         os.mkdir(os.path.join(destdir, 'HEAD'))
         return (commit_list, None)
     elif not os.path.exists(os.path.join(destdir, '.gitdump')):
         if os.path.exists(os.path.join(destdir, 'HEAD')):
             shutil.rmtree(os.path.join(destdir, 'HEAD'))
-            os.mkdir(os.path.join(destdir, 'HEAD'))
+        os.mkdir(os.path.join(destdir, 'HEAD'))
         os.mkdir(os.path.join(destdir, '.gitdump'))
         return (commit_list, None)
 
