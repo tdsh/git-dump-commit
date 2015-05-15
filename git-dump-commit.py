@@ -271,6 +271,7 @@ def check_git_repo():
     (commit_list, patchnum) = get_commit_list()
     commit.config(destdir, patchnum)
     (commit_list, count) = check_head(commit_list)
+    os.rmdir(os.path.join(destdir, 'HEAD'))
     if count:
         commit.update_count(count)
     if commit_list != []:
