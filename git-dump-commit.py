@@ -24,6 +24,13 @@ import re
 import math
 import shutil
 import fnmatch
+import logging
+
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+handler.setLevel(logging.INFO)
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
 
 destdir = "DUMP-COMMIT"
 
@@ -76,7 +83,7 @@ class Commit(object):
             name = template % (self.count, name)
             if len(name) > self.pc_name_max:
                 name = name[:self.pc_name_max - 6] + ".patch"
-            print name
+            logger.info(name)
             with open(os.path.join(self.outdir, name), "w") as f:
                 f.write(patch)
             self.count += 1
@@ -269,13 +276,13 @@ def check_linux_kernel():
             continue
         (done, outdir) = prepare_dir(end)
         if done:
-            print("Skipping {0:12s} (directory already exists)".format(end))
+            logger.info("Skipping {0:12s} (directory already exists)".format(end))
             continue
-        print "Processing %s..%s" % (start, end)
+        logger.info("Processing {0}..{1}".format(start, end))
         (commit_list, patchnum) = get_commit_list(start, end)
         if len(commit_list) == 1 and commit_list[0] == '':
             # empty version
-            print("Skipping {0:12s} (empty)".format(end))
+            logger.info("Skipping {0:12s} (empty)".format(end))
             continue
         commit.config(outdir, patchnum)
         (commit_list, count) = check_head(commit_list,
@@ -309,10 +316,10 @@ def main():
                             )
     (repo, error) = proc.communicate()
     if (error):
-        sys.stderr.write('git dump-commit: {0}\n'.format(error))
+        logger.error('git dump-commit: {0}'.format(error))
         sys.exit(1)
 
-    print "Destination directory: %s" % destdir
+    logger.info("Destination directory: {0}".format(destdir))
     if not os.path.exists(destdir):
         os.mkdir(destdir)
 
