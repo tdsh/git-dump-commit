@@ -273,6 +273,10 @@ def check_linux_kernel():
             continue
         print "Processing %s..%s" % (start, end)
         (commit_list, patchnum) = get_commit_list(start, end)
+        if len(commit_list) == 1 and commit_list[0] == '':
+            # empty version
+            print("Skipping {0:12s} (empty)".format(end))
+            continue
         commit.config(outdir, patchnum)
         (commit_list, count) = check_head(commit_list,
                                           os.path.join(destdir, 'HEAD'),
