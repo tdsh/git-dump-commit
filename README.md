@@ -13,13 +13,17 @@ Usage
 
 ### Run it directly
 
-    % git-dump-commit.py
+    $ git-dump-commit.py
 
 You can run it as git sub-command if you put the file somewhere in your PATH as git-dump-commit.
 
-	% git dump-commit
+    $ git dump-commit
 
 Output files are placed under DUMP-COMMIT directory.
+
+Or you can get verbose output with -v
+
+    $ git dump-commit -v
 
 ### Linux kernel repository
 

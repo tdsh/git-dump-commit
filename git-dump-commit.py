@@ -17,6 +17,7 @@ or
 """
 
 
+import argparse
 import subprocess
 import os
 import sys
@@ -33,6 +34,20 @@ logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
 destdir = "DUMP-COMMIT"
+
+
+def output_progress(count, total, name=None):
+    if logger.getEffectiveLevel() == logging.DEBUG:
+        if name is not None:
+            sys.stdout.write('{0}\n'.format(name))
+    else:
+        percent = float(count) / total
+        slugs = '#' * int(round(percent * 40))
+        spaces = ' ' * (40 - len(slugs))
+        sys.stdout.write("\r[{bar}] {percent}%".format(
+            bar=slugs + spaces, percent=int(round(percent * 100))))
+        sys.stdout.flush()
+    return
 
 
 class Commit(object):
@@ -60,6 +75,7 @@ class Commit(object):
 
     def dump(self, commit_list):
         commitID = ''
+        total = len(commit_list)
         # Run 'git show' and get the commit.
         for commitID in commit_list:
             proc = subprocess.Popen(['git', 'show', commitID],
@@ -83,15 +99,17 @@ class Commit(object):
             name = template % (self.count, name)
             if len(name) > self.pc_name_max:
                 name = name[:self.pc_name_max - 6] + ".patch"
-            logger.info(name)
             with open(os.path.join(self.outdir, name), "w") as f:
                 f.write(patch)
+            output_progress(self.count - 1, total, name)
             self.count += 1
         if commitID == '':
             return
         with open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'),
                   'w') as dump_head:
             dump_head.write('%s\t%d\n' % (commitID, self.count - 1))
+        output_progress(self.count - 1, total)
+        sys.stdout.write('\n')
 
 
 def cmp_linux_kernel(x, y):
@@ -318,6 +336,16 @@ def main():
     if (error):
         logger.error('git dump-commit: {0}'.format(error))
         sys.exit(1)
+
+    # parser arguments
+    parser = argparse.ArgumentParser(description='dump all the commits')
+    parser.add_argument('-v', dest='verbose', action='store_true',
+                        default=False, help='vervose output')
+    args = parser.parse_args()
+
+    if args.verbose is True:
+        handler.setLevel(logging.DEBUG)
+        logger.setLevel(logging.DEBUG)
 
     logger.info("Destination directory: {0}".format(destdir))
     if not os.path.exists(destdir):
