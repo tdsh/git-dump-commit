@@ -34,6 +34,13 @@ logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
 destdir = "DUMP-COMMIT"
+linux_kernel_repos = [
+    'git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux',
+    'git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6',
+    'kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux',
+    'github.com/torvalds/linux',
+    'git@github.com:torvalds/linux'
+]
 
 
 def output_progress(count, total, name=None):
@@ -327,7 +334,7 @@ def check_git_repo():
 
 def main():
     # Check if you're in git repo.
-    proc = subprocess.Popen(['git', 'remote', '-v'],
+    proc = subprocess.Popen(['git', 'config', 'remote.origin.url'],
                             cwd=os.getcwd(),
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE
@@ -351,8 +358,9 @@ def main():
     if not os.path.exists(destdir):
         os.mkdir(destdir)
 
-    if 'torvalds/linux-2.6.git (fetch)' in repo or \
-       'github.com/mirrors/linux.git (fetch)' in repo:
+    repo = re.sub(r'''^(git|https)://''', '', repo)
+    repo = re.sub(r'''.git$''', '', repo).strip()
+    if repo in linux_kernel_repos:
         check_linux_kernel()
     else:
         check_git_repo()
