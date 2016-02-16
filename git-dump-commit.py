@@ -188,8 +188,9 @@ def get_commit_list(*versions):
 
 def prepare_dir(tag):
     done = False
+    quiet = True
     if tag == 'HEAD':
-        return (done, '{0}/{1}'.format(destdir, tag))
+        return (done, quiet, '{0}/{1}'.format(destdir, tag))
     version = tag.split('-')[0]
     outdir = '{0}/{1}/{2}'.format(destdir, version, tag)
     if not os.path.exists('{0}/{1}'.format(destdir, version)):
@@ -198,7 +199,9 @@ def prepare_dir(tag):
         os.mkdir(outdir)
     else:
         done = True
-    return (done, outdir)
+    if done is True and version == tag:
+        quiet = False
+    return (done, quiet, outdir)
 
 
 def check_head(commit_list, head_dir, latest_tag=''):
@@ -299,9 +302,10 @@ def check_linux_kernel():
         end = revision
         if start == '':
             continue
-        (done, outdir) = prepare_dir(end)
+        (done, quiet, outdir) = prepare_dir(end)
         if done:
-            logger.info("Skipping {0:12s} (directory already exists)".format(end))
+            if not quiet:
+                logger.info("Skipping {0:12s} (already done)".format(end))
             continue
         logger.info("Processing {0}..{1}".format(start, end))
         (commit_list, patchnum) = get_commit_list(start, end)
