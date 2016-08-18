@@ -58,12 +58,13 @@ def output_progress(count, total, name=None):
 
 
 class Commit(object):
-    __slots__ = ('digit', 'count', 'outdir', 'pattern1', 'pattern2',
+    __slots__ = ('digit', 'count', 'pos', 'outdir', 'pattern1', 'pattern2',
                  'pattern3', 'pattern4', 'pattern5', 'pc_name_max')
 
     def __init__(self):
         self.digit = 0
         self.count = 1
+        self.pos = 0
         self.outdir = ''
         self.pattern1 = re.compile(r'^\[PATCH[^]]*\]')
         self.pattern2 = re.compile(r'[^-a-z.A-Z_0-9]')
@@ -108,14 +109,15 @@ class Commit(object):
                 name = name[:self.pc_name_max - 6] + ".patch"
             with open(os.path.join(self.outdir, name), "w") as f:
                 f.write(patch)
-            output_progress(self.count - 1, total, name)
+            output_progress(self.pos, total, name)
             self.count += 1
+            self.pos += 1
         if commitID == '':
             return
         with open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'),
                   'w') as dump_head:
             dump_head.write('%s\t%d\n' % (commitID, self.count - 1))
-        output_progress(self.count - 1, total)
+        output_progress(self.pos, total)
         sys.stdout.write('\n')
 
 
