@@ -5,7 +5,7 @@ Dump all the commits in current Git repository
 Contents
 ----
 
-A Python script to extract and dump all the git commits from your current directory which should be a Git repository.
+A Python script to extract and dump all the git commits from your current directory which should be a Git repository. It supports Python 3 only.
 
 
 Usage

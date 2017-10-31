@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 #
 # Copyright (C) 2013 Tadashi Abe (tadashi.abe@gmail.com)
 # the BSD License: http://www.opensource.org/licenses/bsd-license.php
@@ -93,9 +92,10 @@ class Commit(object):
                                     )
             (patch, error) = proc.communicate()
             if (error):
-                sys.stderr.write('git dump-commit: {0}\n'.format(error))
+                logger.error('git dump-commit: {0}\n'.format(error))
                 sys.exit(1)
             # Extract subject
+            patch = patch.decode('utf-8')
             name = patch.split('\n')[4].strip()
             # format the name of patch
             name = self.pattern1.sub('', name)
@@ -121,35 +121,28 @@ class Commit(object):
         sys.stdout.write('\n')
 
 
-def cmp_linux_kernel(x, y):
-    vermagic = [0, 0]
-    for index, n in enumerate([x, y]):
-        (head, tail) = n.rsplit('.', 1)
-        if head == 'v2.6':
-            version = '2'
-            patchlevel = '06'
-        else:   # v3.x or v4.x
-            version = head.replace('v', '')
-            sublevel = '00'
+def key_linux_kernel(version_bytes):
+    (head, tail) = version_bytes.decode('utf-8').rsplit('.', 1)
+    if head == 'v2.6':
+        version = '2'
+        patchlevel = '06'
+    else:   # v3.x or newer
+        version = head.replace('v', '')
+        sublevel = '00'
 
-        if '-rc' in tail:
-            (first, second) = ['{0:>02}'.format(i) for i in tail.split('-rc')]
-        elif '-tree' in tail:   # workaround for 2.6.11-tree
-            (first, second) = ('11', '99')
-        else:
-            (first, second) = ['{0:>02}'.format(i) for i in [tail, '99']]
-        if version == '2':
-            (sublevel, extraver) = (first, second)
-        else:   # v3.x or v4.x
-            (patchlevel, extraver) = (first, second)
-        vermagic[index] = int(version + patchlevel + sublevel + extraver)
-
-    if vermagic[0] > vermagic[1]:
-        return 1
-    if vermagic[0] < vermagic[1]:
-        return -1
+    if '-rc' in tail:
+        (first, second) = ['{0:>02}'.format(i) for i in tail.split('-rc')]
+    elif '-tree' in tail:   # workaround for 2.6.11-tree
+        (first, second) = ('11', '99')
     else:
-        return 0
+        (first, second) = ['{0:>02}'.format(i) for i in [tail, '99']]
+
+    if version == '2':
+        (sublevel, extraver) = (first, second)
+    else:   # v3.x or v4.x
+        (patchlevel, extraver) = (first, second)
+
+    return int(version + patchlevel + sublevel + extraver)
 
 
 def get_tag():
@@ -162,10 +155,12 @@ def get_tag():
                             stderr=subprocess.PIPE
                             )
     (out, error) = proc.communicate()
+    if error:
+        return (None, error)
     out = out.split()
-    res = sorted(out, cmp=cmp_linux_kernel)
-    res.extend(['HEAD'])
-    return (res, error)
+    res = sorted(out, key=key_linux_kernel)
+    res.append(b'HEAD')
+    return ([i.decode('utf-8') for i in res], error)
 
 
 def get_commit_list(*versions):
@@ -177,9 +172,9 @@ def get_commit_list(*versions):
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     (commit_list, error) = pr.communicate()
     if error:
-        sys.stderr.write('git dump-commit: {0}\n'.format(error))
+        logger.error('git dump-commit: {0}\n'.format(error))
         sys.exit(1)
-    commit_list = commit_list.split('\n')
+    commit_list = commit_list.decode('utf-8').split('\n')
     if len(commit_list) < 10000:
         patchnum = 1000
     else:
@@ -293,7 +288,7 @@ def check_linux_kernel():
     """
     (revs, error) = get_tag()
     if (error):
-        sys.stderr.write('git dump-commit: {0}\n'.format(error))
+        logger.error('git dump-commit: {0}'.format(error))
         sys.exit(1)
 
     latest_tag = revs[-2]
@@ -364,8 +359,8 @@ def main():
     if not os.path.exists(destdir):
         os.mkdir(destdir)
 
-    repo = re.sub(r'''^(git|https)://''', '', repo)
-    repo = re.sub(r'''.git$''', '', repo).strip()
+    repo = re.sub(r'''^(git|https)://''', '', repo.decode('utf-8'))
+    repo = repo.rstrip('.git\n')
     if repo in linux_kernel_repos:
         check_linux_kernel()
     else:
