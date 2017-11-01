@@ -16,7 +16,6 @@ or
 """
 
 
-import argparse
 import subprocess
 import os
 import sys
@@ -345,13 +344,8 @@ def main():
         logger.error('git dump-commit: {0}'.format(error))
         sys.exit(1)
 
-    # parser arguments
-    parser = argparse.ArgumentParser(description='dump all the commits')
-    parser.add_argument('-v', dest='verbose', action='store_true',
-                        default=False, help='vervose output')
-    args = parser.parse_args()
-
-    if args.verbose is True:
+    if '-v' in sys.argv:
+        # verbose output
         handler.setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
 
