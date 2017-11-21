@@ -94,8 +94,7 @@ class Commit(object):
                 logger.error('git dump-commit: {0}\n'.format(error))
                 sys.exit(1)
             # Extract subject
-            patch = patch.decode('utf-8')
-            name = patch.split('\n')[4].strip()
+            name = patch.splitlines()[4].strip().decode('utf-8', 'ignore')
             # format the name of patch
             name = self.pattern1.sub('', name)
             name = self.pattern2.sub('-', name)
@@ -106,7 +105,7 @@ class Commit(object):
             name = template % (self.count, name)
             if len(name) > self.pc_name_max:
                 name = name[:self.pc_name_max - 6] + ".patch"
-            with open(os.path.join(self.outdir, name), "w") as f:
+            with open(os.path.join(self.outdir, name), "wb") as f:
                 f.write(patch)
             output_progress(self.pos, total, name)
             self.count += 1
