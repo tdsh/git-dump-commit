@@ -113,29 +113,29 @@ class Commit(object):
         if commitID == '':
             return
         with open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'),
-                  'w') as dump_head:
-            dump_head.write('%s\t%d\n' % (commitID, self.count - 1))
+                  'wb') as dump_head:
+            dump_head.write(b'%s\t%d\n' % (commitID, self.count - 1))
         output_progress(self.pos, total)
         sys.stdout.write('\n')
 
 
 def key_linux_kernel(version_bytes):
-    (head, tail) = version_bytes.decode('utf-8').rsplit('.', 1)
-    if head == 'v2.6':
-        version = '2'
-        patchlevel = '06'
+    (head, tail) = version_bytes.rsplit(b'.', 1)
+    if head == b'v2.6':
+        version = b'2'
+        patchlevel = b'06'
     else:   # v3.x or newer
-        version = head.replace('v', '')
-        sublevel = '00'
+        version = head.replace(b'v', b'')
+        sublevel = b'00'
 
-    if '-rc' in tail:
-        (first, second) = ['{0:>02}'.format(i) for i in tail.split('-rc')]
-    elif '-tree' in tail:   # workaround for 2.6.11-tree
-        (first, second) = ('11', '99')
+    if b'-rc' in tail:
+        (first, second) = [b'0' + i if len(i) == 1 else i for i in tail.split(b'-rc')]
+    elif b'-tree' in tail:   # workaround for 2.6.11-tree
+        (first, second) = (b'11', b'99')
     else:
-        (first, second) = ['{0:>02}'.format(i) for i in [tail, '99']]
+        (first, second) = [b'0' + i if len(i) == 1 else i for i in [tail, b'99']]
 
-    if version == '2':
+    if version == b'2':
         (sublevel, extraver) = (first, second)
     else:   # v3.x or v4.x
         (patchlevel, extraver) = (first, second)
@@ -172,7 +172,7 @@ def get_commit_list(*versions):
     if error:
         logger.error('git dump-commit: {0}\n'.format(error))
         sys.exit(1)
-    commit_list = commit_list.decode('utf-8').split('\n')
+    commit_list = commit_list.splitlines()
     if len(commit_list) < 10000:
         patchnum = 1000
     else:
@@ -199,7 +199,7 @@ def prepare_dir(tag):
     return (done, quiet, outdir)
 
 
-def check_head(commit_list, head_dir, latest_tag=''):
+def check_head(commit_list, head_dir, latest_tag=b''):
     if not os.path.exists(head_dir):
         if os.path.exists(os.path.join(destdir, '.gitdump')):
             shutil.rmtree(os.path.join(destdir, '.gitdump'))
@@ -214,10 +214,10 @@ def check_head(commit_list, head_dir, latest_tag=''):
         return (commit_list, None)
 
     try:
-        f = open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'), 'r')
-        last_commit = f.read()
-        f.close()
+        with open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'), 'rb') as f:
+            last_commit = f.read()
         (last_commit, pos) = last_commit.split()
+        pos = pos.decode('utf-8')
     except:
         shutil.rmtree(os.path.join(destdir, '.gitdump'))
         os.mkdir(os.path.join(destdir, '.gitdump'))
@@ -226,9 +226,9 @@ def check_head(commit_list, head_dir, latest_tag=''):
         return (commit_list, None)
 
     # handling HEAD when new tag is added.
-    if latest_tag != '':
+    if latest_tag != b'':
         try:
-            with open(os.path.join(destdir, '.gitdump', 'latest_tag'), 'r') as f:
+            with open(os.path.join(destdir, '.gitdump', 'latest_tag'), 'rb') as f:
                 current_tag = f.read().strip()
             if current_tag != latest_tag:
                 raise Exception('New tag was added')
@@ -237,7 +237,7 @@ def check_head(commit_list, head_dir, latest_tag=''):
             os.mkdir(os.path.join(destdir, '.gitdump'))
             shutil.rmtree(head_dir)
             os.mkdir(head_dir)
-            with open(os.path.join(destdir, '.gitdump', 'latest_tag'), 'w') as f:
+            with open(os.path.join(destdir, '.gitdump', 'latest_tag'), 'wb') as f:
                 f.write(latest_tag)
             return (commit_list, None)
 
@@ -262,7 +262,7 @@ def check_head(commit_list, head_dir, latest_tag=''):
         os.mkdir(head_dir)
         return (commit_list, None)
 
-    with open(os.path.join(head_dir, patch[0]), 'r') as f:
+    with open(os.path.join(head_dir, patch[0]), 'rb') as f:
         commit = f.readline().strip().split()[1]
     if commit != last_commit:
         return (commit_list, None)
@@ -289,7 +289,7 @@ def check_linux_kernel():
         logger.error('git dump-commit: {0}'.format(error))
         sys.exit(1)
 
-    latest_tag = revs[-2]
+    latest_tag = revs[-2].encode('utf-8')
     end = ''
     commit = Commit()
     for revision in revs:
