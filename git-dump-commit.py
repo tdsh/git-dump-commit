@@ -91,7 +91,7 @@ class Commit(object):
                                     )
             (patch, error) = proc.communicate()
             if (error):
-                logger.error('git dump-commit: {0}\n'.format(error))
+                logger.error('\n\n{0}'.format(error.decode('utf-8')))
                 sys.exit(1)
             # Extract subject
             name = patch.splitlines()[4].strip().decode('utf-8', 'ignore')
@@ -170,7 +170,7 @@ def get_commit_list(*versions):
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     (commit_list, error) = pr.communicate()
     if error:
-        logger.error('git dump-commit: {0}\n'.format(error))
+        logger.error('\n\n{0}'.format(error.decode('utf-8')))
         sys.exit(1)
     commit_list = commit_list.splitlines()
     if len(commit_list) < 10000:
@@ -286,7 +286,7 @@ def check_linux_kernel():
     """
     (revs, error) = get_tag()
     if (error):
-        logger.error('git dump-commit: {0}'.format(error))
+        logger.error('\n\n{0}'.format(error.decode('utf-8')))
         sys.exit(1)
 
     latest_tag = revs[-2].encode('utf-8')
@@ -340,7 +340,7 @@ def main():
                             )
     (repo, error) = proc.communicate()
     if (error):
-        logger.error('git dump-commit: {0}'.format(error))
+        logger.error('\n\n{0}'.format(error.decode('utf-8')))
         sys.exit(1)
 
     if '-v' in sys.argv:
