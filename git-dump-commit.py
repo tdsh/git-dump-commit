@@ -84,14 +84,11 @@ class Commit(object):
         total = len(commit_list)
         # Run 'git show' and get the commit.
         for commitID in commit_list:
-            proc = subprocess.Popen(['git', 'show', commitID],
-                                    cwd=os.getcwd(),
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE
-                                    )
-            (patch, error) = proc.communicate()
-            if (error):
-                logger.error('\n\n{0}'.format(error.decode('utf-8')))
+            try:
+                patch = subprocess.check_output(['git', 'show', commitID], shell=False,
+                                                stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as e:
+                logger.error('\n\n{0}'.format(e.output.decode('utf-8')))
                 sys.exit(1)
             # Extract subject
             name = patch.splitlines()[4].strip().decode('utf-8', 'ignore')
@@ -147,13 +144,12 @@ def _get_tag():
     """Helper to look up linux kernel
     Verify tags via "git tag" and sort them.
     """
-    proc = subprocess.Popen(['git', 'tag'],
-                            cwd=os.getcwd(),
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE
-                            )
-    (out, error) = proc.communicate()
-    if error:
+    error = b''
+    try:
+        out = subprocess.check_output(['git', 'tag'],
+                                      shell=False, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        error = e.output
         return (None, error)
     out = out.split()
     res = sorted(out, key=_key_linux_kernel)
@@ -166,11 +162,11 @@ def _get_commit_list(*versions):
     if versions:
         scope = versions[0] + '..' + versions[1]
         cmd_and_args.append(scope)
-    pr = subprocess.Popen(cmd_and_args, cwd=os.getcwd(),
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    (commit_list, error) = pr.communicate()
-    if error:
-        logger.error('\n\n{0}'.format(error.decode('utf-8')))
+    try:
+        commit_list = subprocess.check_output(cmd_and_args,
+                                              shell=False, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        logger.error('\n\n{0}'.format(e.output.decode('utf-8')))
         sys.exit(1)
     commit_list = commit_list.splitlines()
     if len(commit_list) < 10000:
@@ -333,14 +329,11 @@ def _check_git_repo():
 
 def main():
     # Check if you're in git repo.
-    proc = subprocess.Popen(['git', 'config', 'remote.origin.url'],
-                            cwd=os.getcwd(),
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE
-                            )
-    (repo, error) = proc.communicate()
-    if (error):
-        logger.error('\n\n{0}'.format(error.decode('utf-8')))
+    try:
+        repo = subprocess.check_output(['git', 'config', 'remote.origin.url'],
+                                       shell=False, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        logger.error('\n\n{0}'.format(e.output.decode('utf-8')))
         sys.exit(1)
 
     if '-v' in sys.argv:
