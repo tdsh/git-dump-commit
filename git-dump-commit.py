@@ -41,7 +41,7 @@ linux_kernel_repos = [
 ]
 
 
-def output_progress(count, total, name=None):
+def _output_progress(count, total, name=None):
     if logger.getEffectiveLevel() == logging.DEBUG:
         if name is not None:
             sys.stdout.write('{0}\n'.format(name))
@@ -107,7 +107,7 @@ class Commit(object):
                 name = name[:self.pc_name_max - 6] + ".patch"
             with open(os.path.join(self.outdir, name), "wb") as f:
                 f.write(patch)
-            output_progress(self.pos, total, name)
+            _output_progress(self.pos, total, name)
             self.count += 1
             self.pos += 1
         if commitID == '':
@@ -115,11 +115,11 @@ class Commit(object):
         with open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'),
                   'wb') as dump_head:
             dump_head.write(b'%s\t%d\n' % (commitID, self.count - 1))
-        output_progress(self.pos, total)
+        _output_progress(self.pos, total)
         sys.stdout.write('\n')
 
 
-def key_linux_kernel(version_bytes):
+def _key_linux_kernel(version_bytes):
     (head, tail) = version_bytes.rsplit(b'.', 1)
     if head == b'v2.6':
         version = b'2'
@@ -143,7 +143,7 @@ def key_linux_kernel(version_bytes):
     return int(version + patchlevel + sublevel + extraver)
 
 
-def get_tag():
+def _get_tag():
     """Helper to look up linux kernel
     Verify tags via "git tag" and sort them.
     """
@@ -156,12 +156,12 @@ def get_tag():
     if error:
         return (None, error)
     out = out.split()
-    res = sorted(out, key=key_linux_kernel)
+    res = sorted(out, key=_key_linux_kernel)
     res.append(b'HEAD')
     return ([i.decode('utf-8') for i in res], error)
 
 
-def get_commit_list(*versions):
+def _get_commit_list(*versions):
     cmd_and_args = ['git', 'log', '--no-merges', '--pretty=format:%H']
     if versions:
         scope = versions[0] + '..' + versions[1]
@@ -199,7 +199,7 @@ def prepare_dir(tag):
     return (done, quiet, outdir)
 
 
-def check_head(commit_list, head_dir, latest_tag=b''):
+def _check_head(commit_list, head_dir, latest_tag=b''):
     if not os.path.exists(head_dir):
         if os.path.exists(os.path.join(destdir, '.gitdump')):
             shutil.rmtree(os.path.join(destdir, '.gitdump'))
@@ -280,11 +280,11 @@ def check_head(commit_list, head_dir, latest_tag=b''):
     return (commit_list[index + 1:], count)
 
 
-def check_linux_kernel():
+def _check_linux_kernel():
     """traverses linux kernel repository you're in
     and dumps all the commits of each tag.
     """
-    (revs, error) = get_tag()
+    (revs, error) = _get_tag()
     if (error):
         logger.error('\n\n{0}'.format(error.decode('utf-8')))
         sys.exit(1)
@@ -303,28 +303,28 @@ def check_linux_kernel():
                 logger.info("Skipping {0:12s} (already done)".format(end))
             continue
         logger.info("Processing {0}..{1}".format(start, end))
-        (commit_list, patchnum) = get_commit_list(start, end)
+        (commit_list, patchnum) = _get_commit_list(start, end)
         if len(commit_list) == 1 and commit_list[0] == '':
             # empty version
             logger.info("Skipping {0:12s} (empty)".format(end))
             continue
         commit.config(outdir, patchnum)
-        (commit_list, count) = check_head(commit_list,
-                                          os.path.join(destdir, 'HEAD'),
-                                          latest_tag)
+        (commit_list, count) = _check_head(commit_list,
+                                           os.path.join(destdir, 'HEAD'),
+                                           latest_tag)
         if count:
             commit.update_count(count)
         if commit_list != []:
             commit.dump(commit_list)
 
 
-def check_git_repo():
+def _check_git_repo():
     """Dump all the commits of current branch.
     """
     commit = Commit()
-    (commit_list, patchnum) = get_commit_list()
+    (commit_list, patchnum) = _get_commit_list()
     commit.config(destdir, patchnum)
-    (commit_list, count) = check_head(commit_list, destdir)
+    (commit_list, count) = _check_head(commit_list, destdir)
     if count:
         commit.update_count(count)
     if commit_list != []:
@@ -355,9 +355,9 @@ def main():
     repo = re.sub(r'''^(git|https)://''', '', repo.decode('utf-8'))
     repo = repo.rstrip('.git\n')
     if repo in linux_kernel_repos:
-        check_linux_kernel()
+        _check_linux_kernel()
     else:
-        check_git_repo()
+        _check_git_repo()
 
 
 if __name__ == "__main__":
