@@ -49,8 +49,9 @@ def _output_progress(count, total, name=None):
         percent = float(count) / total
         slugs = '#' * int(round(percent * 40))
         spaces = ' ' * (40 - len(slugs))
-        sys.stdout.write("\r[{bar}] {percent}%".format(
-            bar=slugs + spaces, percent=int(round(percent * 100))))
+        sys.stdout.write("\r[{bar}] {percent:>3}% ({count:>{digit}} / {total})".format(
+            bar=slugs + spaces, percent=int(round(percent * 100)),
+            count=count, total=total, digit=len(str(total))))
         sys.stdout.flush()
     return
 
