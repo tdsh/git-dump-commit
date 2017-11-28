@@ -16,13 +16,13 @@ or
 """
 
 
-import subprocess
-import os
-import sys
-import re
-import shutil
 import fnmatch
 import logging
+import os
+import re
+import shutil
+import subprocess
+import sys
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
@@ -41,6 +41,13 @@ linux_kernel_repos = [
 
 
 def _output_progress(count, total, name=None):
+    """Outputs progress bar, percentage and the number of files dumped.
+
+    Args:
+        count: an integer of the number of commit dune with dump.
+        total: an integer of the total number of commit.
+        name: a str of the name of patch file.
+    """
     if logger.getEffectiveLevel() == logging.DEBUG:
         if name is not None:
             sys.stdout.write('{0}\n'.format(name))
@@ -56,10 +63,24 @@ def _output_progress(count, total, name=None):
 
 
 class DumpGenerator(object):
+    """class which holds various dump status and generated dump file actually.
+
+    Attributes:
+        digit: an integer indicating number of digits in the range of commits.
+        count: an integer indicating current number of commit.
+        outdir: a str of output directory.
+        pattern1: a re pattern object 1 to be used to format dump file name.
+        pattern2: a re pattern object 2 to be used to format dump file name.
+        pattern3: a re pattern object 3 to be used to format dump file name.
+        pattern4: a re pattern object 4 to be used to format dump file name.
+        pattern5: a re pattern object 5 to be used to format dump file name.
+        pc_name_max: an integer indicating the max length of path name.
+    """
     __slots__ = ('digit', 'offset', 'outdir', 'pattern1', 'pattern2',
                  'pattern3', 'pattern4', 'pattern5', 'pc_name_max')
 
     def __init__(self):
+        """Inits DumpGenerator."""
         self.digit = 0
         self.offset = 1
         self.outdir = ''
@@ -71,6 +92,7 @@ class DumpGenerator(object):
         self.pc_name_max = os.pathconf('/tmp', 'PC_NAME_MAX')
 
     def config(self, outdir, patchnum):
+        """Changes digit and outdir. And resets offset."""
         if patchnum < 1000:
             patchnum = 1000
         self.digit = len(str(patchnum))
@@ -81,6 +103,7 @@ class DumpGenerator(object):
         self.offset = offset
 
     def dump(self, commit_list):
+        """Dumps each commit to file actually."""
         commitID = ''
         pos = 0
         total = len(commit_list)
@@ -119,6 +142,8 @@ class DumpGenerator(object):
 
 
 def _key_linux_kernel(version_bytes):
+    """Custom key function to sort tag names of Linux kernel repo by chronological order.
+    """
     (head, tail) = version_bytes.rsplit(b'.', 1)
     if head == b'v2.6':
         version = b'2'
@@ -143,8 +168,14 @@ def _key_linux_kernel(version_bytes):
 
 
 def _get_tag():
-    """Helper to look up linux kernel
-    Verify tags via "git tag" and sort them.
+    """Helper function to look up linux kernel.
+
+    This verifies tags via "git tag" and sorts them.
+
+    Returns:
+        A tuple of
+        - a list of str representing tag name.
+        - bytes representing error.
     """
     error = b''
     try:
@@ -159,10 +190,18 @@ def _get_tag():
     return ([i.decode('utf-8') for i in res], error)
 
 
-def _get_commit_list(*versions):
+def _get_commit_list(start='', end=''):
+    """Gets list of commit ID and the length.
+
+    Args:
+        start: str representing tag name which starts commit.
+        end: str representing tag name which ends commit.
+    Returns:
+        commit_list: a list of bytes representing commit ID.
+    """
     cmd_and_args = ['git', 'log', '--no-merges', '--pretty=format:%H']
-    if versions:
-        scope = versions[0] + '..' + versions[1]
+    if start or end:
+        scope = start + '..' + end
         cmd_and_args.append(scope)
     try:
         commit_list = subprocess.check_output(cmd_and_args,
@@ -175,11 +214,21 @@ def _get_commit_list(*versions):
     return commit_list
 
 
-def prepare_dir(tag):
+def _prepare_dir(tag):
+    """Creates directory whose name is tag.
+
+    Args:
+        tag: str representing tag name.
+    Returns:
+        A tuple of the following 3 elements.
+        - bool. True if the directory exists already.
+        - bool. True if tag is RC version.
+        - str of directory name
+    """
     done = False
-    quiet = True
+    rc_release = True
     if tag == 'HEAD':
-        return (done, quiet, '{0}/{1}'.format(destdir, tag))
+        return (done, rc_release, '{0}/{1}'.format(destdir, tag))
     version = tag.split('-')[0]
     outdir = '{0}/{1}/{2}'.format(destdir, version, tag)
     if not os.path.exists('{0}/{1}'.format(destdir, version)):
@@ -189,11 +238,23 @@ def prepare_dir(tag):
     else:
         done = True
     if done is True and version == tag:
-        quiet = False
-    return (done, quiet, outdir)
+        rc_release = False
+    return (done, rc_release, outdir)
 
 
 def _fast_forward_commit_list(commit_list, head_dir, latest_tag=b''):
+    """Checks commit ID dumped most recently and fast-forwards commit_list
+    to avoid unnecessary dump.
+
+    Args:
+        commit_list: list of bytes representing commit ID.
+        head_dir: A string of HEAD directory.
+        latest_tag: A bytes of the latest tag name.
+    Returns:
+        A tuple of
+        - a list of bytes of commit ID with fast-forwarded if applicable.
+        - an integer representing the next offset.
+    """
     # If head_dir or DUMP-COMMIT/.gitdump or DUMP-COMMIT/.gitdump/DUMP_HEAD doesn't exist,
     # it can't track current status. Do full dump.
     if not os.path.exists(head_dir) or not os.path.exists(os.path.join(destdir, '.gitdump')) \
@@ -264,7 +325,9 @@ def _fast_forward_commit_list(commit_list, head_dir, latest_tag=b''):
 
 
 def _check_linux_kernel():
-    """traverses linux kernel repository you're in
+    """Entry point in Linux kernel repo.
+
+    It traverses linux kernel repository you're in
     and dumps all the commits of each tag.
     """
     (revs, error) = _get_tag()
@@ -280,9 +343,9 @@ def _check_linux_kernel():
         end = revision
         if start == '':
             continue
-        (done, quiet, outdir) = prepare_dir(end)
+        (done, rc_release, outdir) = _prepare_dir(end)
         if done:
-            if not quiet:
+            if not rc_release:
                 logger.info("Skipping {0:12s} (already done)".format(end))
             continue
         logger.info("Processing {0}..{1}".format(start, end))
