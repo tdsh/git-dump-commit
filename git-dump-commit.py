@@ -56,7 +56,7 @@ def _output_progress(count, total, name=None):
     return
 
 
-class Commit(object):
+class DumpGenerator(object):
     __slots__ = ('digit', 'count', 'pos', 'outdir', 'pattern1', 'pattern2',
                  'pattern3', 'pattern4', 'pattern5', 'pc_name_max')
 
@@ -288,7 +288,7 @@ def _check_linux_kernel():
 
     latest_tag = revs[-2].encode('utf-8')
     end = ''
-    commit = Commit()
+    dump_generator = DumpGenerator()
     for revision in revs:
         start = end
         end = revision
@@ -305,27 +305,27 @@ def _check_linux_kernel():
             # empty version
             logger.info("Skipping {0:12s} (empty)".format(end))
             continue
-        commit.config(outdir, patchnum)
+        dump_generator.config(outdir, patchnum)
         (commit_list, count) = _check_head(commit_list,
                                            os.path.join(destdir, 'HEAD'),
                                            latest_tag)
         if count:
-            commit.update_count(count)
+            dump_generator.update_count(count)
         if commit_list != []:
-            commit.dump(commit_list)
+            dump_generator.dump(commit_list)
 
 
 def _check_git_repo():
     """Dump all the commits of current branch.
     """
-    commit = Commit()
+    dump_generator = DumpGenerator()
     (commit_list, patchnum) = _get_commit_list()
-    commit.config(destdir, patchnum)
+    dump_generator.config(destdir, patchnum)
     (commit_list, count) = _check_head(commit_list, destdir)
     if count:
-        commit.update_count(count)
+        dump_generator.update_count(count)
     if commit_list != []:
-        commit.dump(commit_list)
+        dump_generator.dump(commit_list)
 
 
 def main():
