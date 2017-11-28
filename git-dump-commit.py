@@ -82,6 +82,7 @@ class DumpGenerator(object):
 
     def dump(self, commit_list):
         commitID = ''
+        self.pos = 0
         total = len(commit_list)
         # Run 'git show' and get the commit.
         for commitID in commit_list:
