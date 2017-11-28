@@ -20,7 +20,6 @@ import subprocess
 import os
 import sys
 import re
-import math
 import shutil
 import fnmatch
 import logging
@@ -57,13 +56,12 @@ def _output_progress(count, total, name=None):
 
 
 class DumpGenerator(object):
-    __slots__ = ('digit', 'count', 'pos', 'outdir', 'pattern1', 'pattern2',
+    __slots__ = ('digit', 'offset', 'outdir', 'pattern1', 'pattern2',
                  'pattern3', 'pattern4', 'pattern5', 'pc_name_max')
 
     def __init__(self):
         self.digit = 0
-        self.count = 1
-        self.pos = 0
+        self.offset = 1
         self.outdir = ''
         self.pattern1 = re.compile(r'^\[PATCH[^]]*\]')
         self.pattern2 = re.compile(r'[^-a-z.A-Z_0-9]')
@@ -73,16 +71,18 @@ class DumpGenerator(object):
         self.pc_name_max = os.pathconf('/tmp', 'PC_NAME_MAX')
 
     def config(self, outdir, patchnum):
-        self.digit = int(math.log10(patchnum) + 1)
+        if patchnum < 1000:
+            patchnum = 1000
+        self.digit = len(str(patchnum))
         self.outdir = outdir
-        self.count = 1
+        self.offset = 1
 
-    def update_count(self, count):
-        self.count = count
+    def update_offset(self, offset):
+        self.offset = offset
 
     def dump(self, commit_list):
         commitID = ''
-        self.pos = 0
+        pos = 0
         total = len(commit_list)
         # Run 'git show' and get the commit.
         for commitID in commit_list:
@@ -101,20 +101,20 @@ class DumpGenerator(object):
             name = self.pattern4.sub('', name)
             name = self.pattern5.sub('-', name)
             template = "%0" + str(self.digit) + "d-%s.patch"
-            name = template % (self.count, name)
+            name = template % (self.offset, name)
             if len(name) > self.pc_name_max:
                 name = name[:self.pc_name_max - 6] + ".patch"
             with open(os.path.join(self.outdir, name), "wb") as f:
                 f.write(patch)
-            _output_progress(self.pos, total, name)
-            self.count += 1
-            self.pos += 1
+            self.offset += 1
+            pos += 1
+            _output_progress(pos, total, name)
         if commitID == '':
             return
         with open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'),
                   'wb') as dump_head:
-            dump_head.write(b'%s\t%d\n' % (commitID, self.count - 1))
-        _output_progress(self.pos, total)
+            dump_head.write(b'%s\t%d\n' % (commitID, self.offset - 1))
+        _output_progress(pos, total)
         sys.stdout.write('\n')
 
 
@@ -171,12 +171,8 @@ def _get_commit_list(*versions):
         logger.error('\n\n{0}'.format(e.output.decode('utf-8')))
         sys.exit(1)
     commit_list = commit_list.splitlines()
-    if len(commit_list) < 10000:
-        patchnum = 1000
-    else:
-        patchnum = len(commit_list)
     commit_list.reverse()
-    return (commit_list, patchnum)
+    return commit_list
 
 
 def prepare_dir(tag):
@@ -290,17 +286,17 @@ def _check_linux_kernel():
                 logger.info("Skipping {0:12s} (already done)".format(end))
             continue
         logger.info("Processing {0}..{1}".format(start, end))
-        (commit_list, patchnum) = _get_commit_list(start, end)
+        commit_list = _get_commit_list(start, end)
         if len(commit_list) == 1 and commit_list[0] == '':
             # empty version
             logger.info("Skipping {0:12s} (empty)".format(end))
             continue
-        dump_generator.config(outdir, patchnum)
-        (commit_list, count) = _fast_forward_commit_list(commit_list,
-                                                         os.path.join(destdir, 'HEAD'),
-                                                         latest_tag)
-        if count:
-            dump_generator.update_count(count)
+        dump_generator.config(outdir, len(commit_list))
+        (commit_list, offset) = _fast_forward_commit_list(commit_list,
+                                                          os.path.join(destdir, 'HEAD'),
+                                                          latest_tag)
+        if offset:
+            dump_generator.update_offset(offset)
         if commit_list != []:
             dump_generator.dump(commit_list)
 
@@ -309,11 +305,11 @@ def _check_git_repo():
     """Dump all the commits of current branch.
     """
     dump_generator = DumpGenerator()
-    (commit_list, patchnum) = _get_commit_list()
-    dump_generator.config(destdir, patchnum)
-    (commit_list, count) = _fast_forward_commit_list(commit_list, destdir)
-    if count:
-        dump_generator.update_count(count)
+    commit_list = _get_commit_list()
+    dump_generator.config(destdir, len(commit_list))
+    (commit_list, offset) = _fast_forward_commit_list(commit_list, destdir)
+    if offset:
+        dump_generator.update_offset(offset)
     if commit_list != []:
         dump_generator.dump(commit_list)
 
