@@ -197,33 +197,29 @@ def prepare_dir(tag):
     return (done, quiet, outdir)
 
 
-def _check_head(commit_list, head_dir, latest_tag=b''):
-    if not os.path.exists(head_dir):
-        if os.path.exists(os.path.join(destdir, '.gitdump')):
-            shutil.rmtree(os.path.join(destdir, '.gitdump'))
-        os.mkdir(head_dir)
-        os.mkdir(os.path.join(destdir, '.gitdump'))
-        return (commit_list, None)
-    elif not os.path.exists(os.path.join(destdir, '.gitdump')):
-        if os.path.exists(head_dir):
-            shutil.rmtree(head_dir)
+def _fast_forward_commit_list(commit_list, head_dir, latest_tag=b''):
+    # If head_dir or DUMP-COMMIT/.gitdump or DUMP-COMMIT/.gitdump/DUMP_HEAD doesn't exist,
+    # it can't track current status. Do full dump.
+    if not os.path.exists(head_dir) or not os.path.exists(os.path.join(destdir, '.gitdump')) \
+       or not os.path.exists(os.path.join(destdir, '.gitdump', 'DUMP_HEAD')):
+        shutil.rmtree(head_dir, ignore_errors=True)
+        shutil.rmtree(os.path.join(destdir, '.gitdump'), ignore_errors=True)
         os.mkdir(head_dir)
         os.mkdir(os.path.join(destdir, '.gitdump'))
         return (commit_list, None)
 
     try:
         with open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'), 'rb') as f:
-            last_commit = f.read()
-        (last_commit, pos) = last_commit.split()
-        pos = pos.decode('utf-8')
+            last_commit, offset = f.read().split()
+        offset = int(offset)
     except:
-        shutil.rmtree(os.path.join(destdir, '.gitdump'))
-        os.mkdir(os.path.join(destdir, '.gitdump'))
-        shutil.rmtree(head_dir)
+        shutil.rmtree(head_dir, ignore_errors=True)
+        shutil.rmtree(os.path.join(destdir, '.gitdump'), ignore_errors=True)
         os.mkdir(head_dir)
+        os.mkdir(os.path.join(destdir, '.gitdump'))
         return (commit_list, None)
 
-    # handling HEAD when new tag is added.
+    # Dump HEAD whenever new tag is added.
     if latest_tag != b'':
         try:
             with open(os.path.join(destdir, '.gitdump', 'latest_tag'), 'rb') as f:
@@ -231,51 +227,44 @@ def _check_head(commit_list, head_dir, latest_tag=b''):
             if current_tag != latest_tag:
                 raise Exception('New tag was added')
         except:
-            shutil.rmtree(os.path.join(destdir, '.gitdump'))
-            os.mkdir(os.path.join(destdir, '.gitdump'))
             shutil.rmtree(head_dir)
+            shutil.rmtree(os.path.join(destdir, '.gitdump'))
             os.mkdir(head_dir)
+            os.mkdir(os.path.join(destdir, '.gitdump'))
             with open(os.path.join(destdir, '.gitdump', 'latest_tag'), 'wb') as f:
                 f.write(latest_tag)
             return (commit_list, None)
 
-    # check for the actual patch file
+    # Find the latest commit file in HEAD.
     files = os.listdir(head_dir)
     patch = []
-    patch = fnmatch.filter(files, '{0}-*'.format(pos))
-    # Is there any better way?
+    for i in range(5):
+        patch = fnmatch.filter(files, '0' * i + '{0}-*'.format(offset))
+        if patch != []:
+            break
     if patch == []:
-        patch = fnmatch.filter(files, '0{0}-*'.format(pos))
-        if patch == []:
-            patch = fnmatch.filter(files, '00{0}-*'.format(pos))
-            if patch == []:
-                patch = fnmatch.filter(files, '000{0}-*'.format(pos))
-                if patch == []:
-                    patch = fnmatch.filter(files, '0000{0}-*'.format(pos))
-    if patch == []:
-        # Not found.
-        shutil.rmtree(os.path.join(destdir, '.gitdump'))
-        os.mkdir(os.path.join(destdir, '.gitdump'))
+        # Not found. Give up.
         shutil.rmtree(head_dir)
+        shutil.rmtree(os.path.join(destdir, '.gitdump'))
         os.mkdir(head_dir)
+        os.mkdir(os.path.join(destdir, '.gitdump'))
         return (commit_list, None)
 
     with open(os.path.join(head_dir, patch[0]), 'rb') as f:
-        commit = f.readline().strip().split()[1]
-    if commit != last_commit:
+        commitID = f.readline().strip().split()[1]
+    if commitID != last_commit:
+        # Mismatch of last commit ID in DUMP-COMMIT/.gitdump/DUMP_HEAD.
         return (commit_list, None)
 
     try:
         index = commit_list.index(last_commit)
     except:
         return (commit_list, None)
-    pos = int(pos)
-    if pos == len(commit_list):
+    if offset == len(commit_list):
         # No new commit exists.
         return ([], None)
-    #self.count = int(pos) + 1
-    count = int(pos) + 1
-    return (commit_list[index + 1:], count)
+    # Fast-forward commit_list and offset.
+    return (commit_list[index + 1:], offset + 1)
 
 
 def _check_linux_kernel():
@@ -307,9 +296,9 @@ def _check_linux_kernel():
             logger.info("Skipping {0:12s} (empty)".format(end))
             continue
         dump_generator.config(outdir, patchnum)
-        (commit_list, count) = _check_head(commit_list,
-                                           os.path.join(destdir, 'HEAD'),
-                                           latest_tag)
+        (commit_list, count) = _fast_forward_commit_list(commit_list,
+                                                         os.path.join(destdir, 'HEAD'),
+                                                         latest_tag)
         if count:
             dump_generator.update_count(count)
         if commit_list != []:
@@ -322,7 +311,7 @@ def _check_git_repo():
     dump_generator = DumpGenerator()
     (commit_list, patchnum) = _get_commit_list()
     dump_generator.config(destdir, patchnum)
-    (commit_list, count) = _check_head(commit_list, destdir)
+    (commit_list, count) = _fast_forward_commit_list(commit_list, destdir)
     if count:
         dump_generator.update_count(count)
     if commit_list != []:
