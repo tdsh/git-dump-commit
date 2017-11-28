@@ -348,7 +348,6 @@ def _check_linux_kernel():
             if not rc_release:
                 logger.info("Skipping {0:12s} (already done)".format(end))
             continue
-        logger.info("Processing {0}..{1}".format(start, end))
         commit_list = _get_commit_list(start, end)
         if len(commit_list) == 1 and commit_list[0] == '':
             # empty version
@@ -361,7 +360,10 @@ def _check_linux_kernel():
         if offset:
             dump_generator.update_offset(offset)
         if commit_list != []:
+            logger.info("Processing {0}..{1}".format(start, end))
             dump_generator.dump(commit_list)
+        else:
+            logger.info("Processing {0:10s} (up to date)".format(end))
 
 
 def _check_git_repo():
