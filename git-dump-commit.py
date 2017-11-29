@@ -90,27 +90,19 @@ class DumpGenerator(object):
         digit: an integer indicating number of digits in the range of commits.
         count: an integer indicating current number of commit.
         outdir: a str of output directory.
-        pattern1: a re pattern object 1 to be used to format dump file name.
-        pattern2: a re pattern object 2 to be used to format dump file name.
-        pattern3: a re pattern object 3 to be used to format dump file name.
-        pattern4: a re pattern object 4 to be used to format dump file name.
-        pattern5: a re pattern object 5 to be used to format dump file name.
+        pattern: a list of a re pattern object to be used to format dump file name.
         pc_name_max: an integer indicating the max length of path name.
         revision_range: a list of str indicating commit range (start and end).
     """
-    __slots__ = ('digit', 'offset', 'outdir', 'pattern1', 'pattern2',
-                 'pattern3', 'pattern4', 'pattern5', 'pc_name_max', 'revision_range')
+    __slots__ = ('digit', 'offset', 'outdir', 'pattern', 'pc_name_max', 'revision_range')
 
     def __init__(self, head_dir):
         """Inits DumpGenerator."""
         self.digit = 0
         self.offset = 1
         self.outdir = ''
-        self.pattern1 = re.compile(r'^\[PATCH[^]]*\]')
-        self.pattern2 = re.compile(r'[^-a-z.A-Z_0-9]')
-        self.pattern3 = re.compile(r'\.\.\.')
-        self.pattern4 = re.compile(r'\.*$|^-|-$')
-        self.pattern5 = re.compile(r'--*')
+        self.pattern = [re.compile(r'^\[PATCH[^]]*\]'), re.compile(r'[^-a-z.A-Z_0-9]'),
+                        re.compile(r'\.\.\.'), re.compile(r'\.*$|^-|-$'), re.compile(r'--*')]
         self.pc_name_max = os.pathconf('/tmp', 'PC_NAME_MAX')
         self.revision_range = []
         if not os.path.exists(head_dir) or not os.path.exists(os.path.join(destdir, '.gitdump')) \
@@ -145,11 +137,11 @@ class DumpGenerator(object):
             # Extract subject
             name = patch.splitlines()[4].strip().decode('utf-8', 'ignore')
             # format the name of patch
-            name = self.pattern1.sub('', name)
-            name = self.pattern2.sub('-', name)
-            name = self.pattern3.sub('.', name)
-            name = self.pattern4.sub('', name)
-            name = self.pattern5.sub('-', name)
+            name = self.pattern[0].sub('', name)
+            name = self.pattern[1].sub('-', name)
+            name = self.pattern[2].sub('.', name)
+            name = self.pattern[3].sub('', name)
+            name = self.pattern[4].sub('-', name)
             template = "%0" + str(self.digit) + "d-%s.patch"
             name = template % (self.offset, name)
             if len(name) > self.pc_name_max:
