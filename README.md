@@ -51,3 +51,8 @@ Note
 ----
 
 git dump-commit can do incremental dump. It tracks HEAD commit you extracted the last time. When you run git dump-commit next, it starts dump from the next commit, with the appropriate numbering of patch file.
+
+License
+----
+
+Under MIT License: https://tdsh.mit-license.org/
