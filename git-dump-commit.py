@@ -263,14 +263,13 @@ def _prepare_dir(tag):
     return (done, rc_release, outdir)
 
 
-def _fast_forward_commit_list(commit_list, head_dir, latest_tag=b''):
+def _fast_forward_commit_list(commit_list, head_dir):
     """Checks commit ID dumped most recently and fast-forwards commit_list
     to avoid unnecessary dump.
 
     Args:
         commit_list: list of bytes representing commit ID.
         head_dir: A string of HEAD directory.
-        latest_tag: A bytes of the latest tag name.
     Returns:
         A tuple of
         - a list of bytes of commit ID with fast-forwarded if applicable.
@@ -296,22 +295,6 @@ def _fast_forward_commit_list(commit_list, head_dir, latest_tag=b''):
         os.mkdir(head_dir)
         os.mkdir(os.path.join(destdir, '.gitdump'))
         return (commit_list, None)
-
-    # Dump HEAD whenever new tag is added.
-    if latest_tag != b'':
-        try:
-            with open(os.path.join(destdir, '.gitdump', 'latest_tag'), 'rb') as f:
-                current_tag = f.read().strip()
-            if current_tag != latest_tag:
-                raise Exception('New tag was added')
-        except:
-            shutil.rmtree(head_dir)
-            shutil.rmtree(os.path.join(destdir, '.gitdump'))
-            os.mkdir(head_dir)
-            os.mkdir(os.path.join(destdir, '.gitdump'))
-            with open(os.path.join(destdir, '.gitdump', 'latest_tag'), 'wb') as f:
-                f.write(latest_tag)
-            return (commit_list, None)
 
     # Find the latest commit file in HEAD.
     files = os.listdir(head_dir)
@@ -356,7 +339,6 @@ def _check_linux_kernel():
         logger.error('\n\n{0}'.format(error.decode('utf-8')))
         sys.exit(1)
 
-    latest_tag = revs[-2].encode('utf-8')
     end = ''
     dump_generator = DumpGenerator()
     for revision in revs:
@@ -376,8 +358,7 @@ def _check_linux_kernel():
             continue
         dump_generator.config(outdir, len(commit_list))
         (commit_list, offset) = _fast_forward_commit_list(commit_list,
-                                                          os.path.join(destdir, 'HEAD'),
-                                                          latest_tag)
+                                                          os.path.join(destdir, 'HEAD'))
         if offset:
             dump_generator.update_offset(offset)
         if commit_list != []:
