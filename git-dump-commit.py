@@ -100,7 +100,7 @@ class DumpGenerator(object):
     __slots__ = ('digit', 'offset', 'outdir', 'pattern1', 'pattern2',
                  'pattern3', 'pattern4', 'pattern5', 'pc_name_max')
 
-    def __init__(self):
+    def __init__(self, head_dir):
         """Inits DumpGenerator."""
         self.digit = 0
         self.offset = 1
@@ -111,6 +111,9 @@ class DumpGenerator(object):
         self.pattern4 = re.compile(r'\.*$|^-|-$')
         self.pattern5 = re.compile(r'--*')
         self.pc_name_max = os.pathconf('/tmp', 'PC_NAME_MAX')
+        if not os.path.exists(head_dir) or not os.path.exists(os.path.join(destdir, '.gitdump')) \
+                or not os.path.exists(os.path.join(destdir, '.gitdump', 'DUMP_HEAD')):
+            _init_meta_dir(head_dir)
 
     def config(self, outdir, patchnum):
         """Changes digit and outdir. And resets offset."""
@@ -235,7 +238,7 @@ def _get_commit_list(start='', end=''):
     return commit_list
 
 
-def _prepare_dir(tag):
+def _setup_dump_dir(tag):
     """Creates directory whose name is tag.
 
     Args:
@@ -263,6 +266,16 @@ def _prepare_dir(tag):
     return (done, rc_release, outdir)
 
 
+def _init_meta_dir(head_dir):
+    """Initializes HEAD directory and .gitdump where meta file is located at.
+    """
+    shutil.rmtree(head_dir, ignore_errors=True)
+    shutil.rmtree(os.path.join(destdir, '.gitdump'), ignore_errors=True)
+    os.mkdir(head_dir)
+    os.mkdir(os.path.join(destdir, '.gitdump'))
+    return
+
+
 def _fast_forward_commit_list(commit_list, head_dir):
     """Checks commit ID dumped most recently and fast-forwards commit_list
     to avoid unnecessary dump.
@@ -279,10 +292,7 @@ def _fast_forward_commit_list(commit_list, head_dir):
     # it can't track current status. Do full dump.
     if not os.path.exists(head_dir) or not os.path.exists(os.path.join(destdir, '.gitdump')) \
        or not os.path.exists(os.path.join(destdir, '.gitdump', 'DUMP_HEAD')):
-        shutil.rmtree(head_dir, ignore_errors=True)
-        shutil.rmtree(os.path.join(destdir, '.gitdump'), ignore_errors=True)
-        os.mkdir(head_dir)
-        os.mkdir(os.path.join(destdir, '.gitdump'))
+        _init_meta_dir(head_dir)
         return (commit_list, None)
 
     try:
@@ -290,10 +300,7 @@ def _fast_forward_commit_list(commit_list, head_dir):
             last_commit, offset = f.read().split()
         offset = int(offset)
     except:
-        shutil.rmtree(head_dir, ignore_errors=True)
-        shutil.rmtree(os.path.join(destdir, '.gitdump'), ignore_errors=True)
-        os.mkdir(head_dir)
-        os.mkdir(os.path.join(destdir, '.gitdump'))
+        _init_meta_dir(head_dir)
         return (commit_list, None)
 
     # Find the latest commit file in HEAD.
@@ -305,10 +312,7 @@ def _fast_forward_commit_list(commit_list, head_dir):
             break
     if patch == []:
         # Not found. Give up.
-        shutil.rmtree(head_dir)
-        shutil.rmtree(os.path.join(destdir, '.gitdump'))
-        os.mkdir(head_dir)
-        os.mkdir(os.path.join(destdir, '.gitdump'))
+        _init_meta_dir(head_dir)
         return (commit_list, None)
 
     with open(os.path.join(head_dir, patch[0]), 'rb') as f:
@@ -340,13 +344,13 @@ def _check_linux_kernel():
         sys.exit(1)
 
     end = ''
-    dump_generator = DumpGenerator()
+    dump_generator = DumpGenerator(os.path.join(destdir, 'HEAD'))
     for revision in revs:
         start = end
         end = revision
         if start == '':
             continue
-        (done, rc_release, outdir) = _prepare_dir(end)
+        (done, rc_release, outdir) = _setup_dump_dir(end)
         if done:
             if not rc_release:
                 logger.info("Skipping {0:12s} (already done)".format(end))
@@ -371,7 +375,7 @@ def _check_linux_kernel():
 def _check_git_repo():
     """Dump all the commits of current branch.
     """
-    dump_generator = DumpGenerator()
+    dump_generator = DumpGenerator(destdir)
     commit_list = _get_commit_list()
     dump_generator.config(destdir, len(commit_list))
     (commit_list, offset) = _fast_forward_commit_list(commit_list, destdir)
