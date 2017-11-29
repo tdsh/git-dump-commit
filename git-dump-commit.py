@@ -96,9 +96,10 @@ class DumpGenerator(object):
         pattern4: a re pattern object 4 to be used to format dump file name.
         pattern5: a re pattern object 5 to be used to format dump file name.
         pc_name_max: an integer indicating the max length of path name.
+        revision_range: a list of str indicating commit range (start and end).
     """
     __slots__ = ('digit', 'offset', 'outdir', 'pattern1', 'pattern2',
-                 'pattern3', 'pattern4', 'pattern5', 'pc_name_max')
+                 'pattern3', 'pattern4', 'pattern5', 'pc_name_max', 'revision_range')
 
     def __init__(self, head_dir):
         """Inits DumpGenerator."""
@@ -111,17 +112,19 @@ class DumpGenerator(object):
         self.pattern4 = re.compile(r'\.*$|^-|-$')
         self.pattern5 = re.compile(r'--*')
         self.pc_name_max = os.pathconf('/tmp', 'PC_NAME_MAX')
+        self.revision_range = []
         if not os.path.exists(head_dir) or not os.path.exists(os.path.join(destdir, '.gitdump')) \
                 or not os.path.exists(os.path.join(destdir, '.gitdump', 'DUMP_HEAD')):
             _init_meta_dir(head_dir)
 
-    def config(self, outdir, patchnum):
+    def config(self, outdir, patchnum, revision_range=[]):
         """Changes digit and outdir. And resets offset."""
         if patchnum < 1000:
             patchnum = 1000
         self.digit = len(str(patchnum))
         self.outdir = outdir
         self.offset = 1
+        self.revision_range = revision_range
 
     def update_offset(self, offset):
         self.offset = offset
@@ -158,9 +161,10 @@ class DumpGenerator(object):
             _output_progress(pos, total, name)
         if commitID == '':
             return
-        with open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'),
-                  'wb') as dump_head:
-            dump_head.write(b'%s\t%d\n' % (commitID, self.offset - 1))
+        if self.revision_range == [] or self.revision_range[1] == 'HEAD':
+            with open(os.path.join(destdir, '.gitdump', 'DUMP_HEAD'),
+                      'wb') as dump_head:
+                dump_head.write(b'%s\t%d\n' % (commitID, self.offset - 1))
         _output_progress(pos, total)
         sys.stdout.write('\n')
 
@@ -360,7 +364,7 @@ def _check_linux_kernel():
             # empty version
             logger.info("Skipping {0:12s} (empty)".format(end))
             continue
-        dump_generator.config(outdir, len(commit_list))
+        dump_generator.config(outdir, len(commit_list), [start, end])
         (commit_list, offset) = _fast_forward_commit_list(commit_list,
                                                           os.path.join(destdir, 'HEAD'))
         if offset:
