@@ -161,36 +161,10 @@ class DumpGenerator(object):
         sys.stdout.write('\n')
 
 
-def _key_linux_kernel(version_bytes):
-    """Custom key function to sort tag names of Linux kernel repo by chronological order.
-    """
-    (head, tail) = version_bytes.rsplit(b'.', 1)
-    if head == b'v2.6':
-        version = b'2'
-        patchlevel = b'06'
-    else:   # v3.x or newer
-        version = head.replace(b'v', b'')
-        sublevel = b'00'
-
-    if b'-rc' in tail:
-        (first, second) = [b'0' + i if len(i) == 1 else i for i in tail.split(b'-rc')]
-    elif b'-tree' in tail:   # workaround for 2.6.11-tree
-        (first, second) = (b'11', b'99')
-    else:
-        (first, second) = [b'0' + i if len(i) == 1 else i for i in [tail, b'99']]
-
-    if version == b'2':
-        (sublevel, extraver) = (first, second)
-    else:   # v3.x or v4.x
-        (patchlevel, extraver) = (first, second)
-
-    return int(version + patchlevel + sublevel + extraver)
-
-
 def _get_tag():
     """Helper function to look up linux kernel.
 
-    This verifies tags via "git tag" and sorts them.
+    This verifies tags via "git tag" by taggerdate order.
 
     Returns:
         A tuple of
@@ -199,14 +173,13 @@ def _get_tag():
         subprocess.CalledProcessError: an erro occurred in "git tag" command.
     """
     try:
-        out = subprocess.check_output(['git', 'tag'],
+        out = subprocess.check_output(['git', 'tag', '--sort=taggerdate'],
                                       shell=False, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError:
         raise
     out = out.split()
-    res = sorted(out, key=_key_linux_kernel)
-    res.append(b'HEAD')
-    return [i.decode('utf-8') for i in res]
+    out.append(b'HEAD')
+    return [i.decode('utf-8') for i in out]
 
 
 def _get_commit_list(start='', end=''):
