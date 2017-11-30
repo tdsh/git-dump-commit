@@ -195,19 +195,18 @@ def _get_tag():
     Returns:
         A tuple of
         - a list of str representing tag name.
-        - bytes representing error.
+    Raises:
+        subprocess.CalledProcessError: an erro occurred in "git tag" command.
     """
-    error = b''
     try:
         out = subprocess.check_output(['git', 'tag'],
                                       shell=False, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as err:
-        error = err.output
-        return (None, error)
+    except subprocess.CalledProcessError:
+        raise
     out = out.split()
     res = sorted(out, key=_key_linux_kernel)
     res.append(b'HEAD')
-    return ([i.decode('utf-8') for i in res], error)
+    return [i.decode('utf-8') for i in res]
 
 
 def _get_commit_list(start='', end=''):
@@ -218,6 +217,8 @@ def _get_commit_list(start='', end=''):
         end: str representing tag name which ends commit.
     Returns:
         commit_list: a list of bytes representing commit ID.
+    Raises:
+        subprocess.CalledProcessError: an erro occurred in "git log" command.
     """
     cmd_and_args = ['git', 'log', '--no-merges', '--pretty=format:%H']
     if start or end:
@@ -226,9 +227,8 @@ def _get_commit_list(start='', end=''):
     try:
         commit_list = subprocess.check_output(cmd_and_args,
                                               shell=False, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as err:
-        LOGGER.error('\n\n%s', err.output.decode('utf-8'))
-        sys.exit(1)
+    except subprocess.CalledProcessError:
+        raise
     commit_list = commit_list.splitlines()
     commit_list.reverse()
     return commit_list
@@ -283,13 +283,16 @@ def _fast_forward_commit_list(commit_list, head_dir):
         A tuple of
         - a list of bytes of commit ID with fast-forwarded if applicable.
         - an integer representing the next offset.
+    Raises:
+        OSError: an error occurred accessing metadata or patch files.
+        ValueError: an error occurred looking up commit in the list.
     """
     # If head_dir or DUMP-COMMIT/.gitdump or DUMP-COMMIT/.gitdump/DUMP_HEAD doesn't exist,
     # it can't track current status. Do full dump.
     if not os.path.exists(head_dir) or not os.path.exists(os.path.join(DEST_DIR, '.gitdump')) \
        or not os.path.exists(os.path.join(DEST_DIR, '.gitdump', 'DUMP_HEAD')):
         _init_meta_dir(head_dir)
-        return (commit_list, None)
+        raise OSError
 
     try:
         with open(os.path.join(DEST_DIR, '.gitdump', 'DUMP_HEAD'), 'rb') as dump_head:
@@ -297,7 +300,7 @@ def _fast_forward_commit_list(commit_list, head_dir):
         offset = int(offset)
     except OSError:
         _init_meta_dir(head_dir)
-        return (commit_list, None)
+        raise
 
     # Find the latest commit file in HEAD.
     files = os.listdir(head_dir)
@@ -309,18 +312,18 @@ def _fast_forward_commit_list(commit_list, head_dir):
     if patch == []:
         # Not found. Give up.
         _init_meta_dir(head_dir)
-        return (commit_list, None)
+        raise OSError
 
     with open(os.path.join(head_dir, patch[0]), 'rb') as last_commit_file:
         commit_id = last_commit_file.readline().strip().split()[1]
     if commit_id != last_commit:
         # Mismatch of last commit ID in DUMP-COMMIT/.gitdump/DUMP_HEAD.
-        return (commit_list, None)
+        raise OSError
 
     try:
         index = commit_list.index(last_commit)
     except ValueError:
-        return (commit_list, None)
+        raise
     if offset == len(commit_list):
         # No new commit exists.
         return ([], None)
@@ -334,9 +337,10 @@ def _check_linux_kernel():
     It traverses linux kernel repository you're in
     and dumps all the commits of each tag.
     """
-    (revs, error) = _get_tag()
-    if error:
-        LOGGER.error('\n\n%s', error.decode('utf-8'))
+    try:
+        revs = _get_tag()
+    except subprocess.CalledProcessError as err:
+        LOGGER.error('\n\n%s', err.output.decode('utf-8'))
         sys.exit(1)
 
     end = ''
@@ -351,14 +355,21 @@ def _check_linux_kernel():
             if not rc_release:
                 LOGGER.info("Skipping {0:12s} (already done)".format(end))
             continue
-        commit_list = _get_commit_list(start, end)
+        try:
+            commit_list = _get_commit_list(start, end)
+        except subprocess.CalledProcessError as err:
+            LOGGER.error('\n\n%s', err.output.decode('utf-8'))
+            sys.exit(1)
         if len(commit_list) == 1 and commit_list[0] == '':
             # empty version
             LOGGER.info("Skipping {0:12s} (empty)".format(end))
             continue
         dump_generator.config(outdir, len(commit_list), [start, end])
-        (commit_list, offset) = _fast_forward_commit_list(commit_list,
-                                                          os.path.join(DEST_DIR, 'HEAD'))
+        try:
+            (commit_list, offset) = _fast_forward_commit_list(commit_list,
+                                                              os.path.join(DEST_DIR, 'HEAD'))
+        except (OSError, ValueError):
+            offset = None
         if offset:
             dump_generator.update_offset(offset)
         if commit_list != []:
@@ -372,9 +383,16 @@ def _check_git_repo():
     """Dump all the commits of current branch.
     """
     dump_generator = DumpGenerator(DEST_DIR)
-    commit_list = _get_commit_list()
+    try:
+        commit_list = _get_commit_list()
+    except subprocess.CalledProcessError as err:
+        LOGGER.error('\n\n%s', err.output.decode('utf-8'))
+        sys.exit(1)
     dump_generator.config(DEST_DIR, len(commit_list))
-    (commit_list, offset) = _fast_forward_commit_list(commit_list, DEST_DIR)
+    try:
+        (commit_list, offset) = _fast_forward_commit_list(commit_list, DEST_DIR)
+    except (OSError, ValueError):
+        offset = None
     if offset:
         dump_generator.update_offset(offset)
     if commit_list != []:
