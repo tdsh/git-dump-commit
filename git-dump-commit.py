@@ -109,6 +109,16 @@ class DumpGenerator(object):
                 or not os.path.exists(os.path.join(DEST_DIR, '.gitdump', 'DUMP_HEAD')):
             _init_meta_dir(head_dir)
 
+    def check_new_tag(self, tags, head_dir):
+        """Checks if new tag is added."""
+        if not os.path.exists(os.path.join(DEST_DIR, '.gitdump', 'LATEST_TAG')):
+            _init_meta_dir(head_dir)
+        else:
+            with open(os.path.join(DEST_DIR, '.gitdump', 'LATEST_TAG')) as f:
+                latest_tag = f.read()
+            if tags[-2] != latest_tag:
+                _init_meta_dir(head_dir)
+
     def config(self, outdir, patchnum, revision_range=None):
         """Changes digit and outdir. And resets offset."""
         if patchnum < 1000:
@@ -318,6 +328,7 @@ def _check_linux_kernel():
 
     end = ''
     dump_generator = DumpGenerator(os.path.join(DEST_DIR, 'HEAD'))
+    dump_generator.check_new_tag(revs, os.path.join(DEST_DIR, 'HEAD'))
     for revision in revs:
         start = end
         end = revision
