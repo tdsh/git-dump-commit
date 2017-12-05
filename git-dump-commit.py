@@ -93,8 +93,11 @@ class DumpGenerator(object):
         pattern: a list of a re pattern object to be used to format dump file name.
         pc_name_max: an integer indicating the max length of path name.
         revision_range: a list of str indicating commit range (start and end).
+        latest_commit_id: a bytes of the latest commit ID.
+        latest_tag: a str of the latest tag.
     """
-    __slots__ = ('digit', 'offset', 'outdir', 'pattern', 'pc_name_max', 'revision_range')
+    __slots__ = ('digit', 'offset', 'outdir', 'pattern', 'pc_name_max', 'revision_range',
+                 'latest_commit_id', 'latest_tag')
 
     def __init__(self, head_dir):
         """Inits DumpGenerator."""
@@ -105,18 +108,21 @@ class DumpGenerator(object):
                         re.compile(r'\.\.\.'), re.compile(r'\.*$|^-|-$'), re.compile(r'--*')]
         self.pc_name_max = os.pathconf('/tmp', 'PC_NAME_MAX')
         self.revision_range = []
+        self.latest_commit_id = b''
+        self.latest_tag = ''
         if not os.path.exists(head_dir) or not os.path.exists(os.path.join(DEST_DIR, '.gitdump')) \
                 or not os.path.exists(os.path.join(DEST_DIR, '.gitdump', 'DUMP_HEAD')):
             _init_meta_dir(head_dir)
 
-    def check_new_tag(self, tags, head_dir):
+    def check_new_tag(self, latest_tag, head_dir):
         """Checks if new tag is added."""
+        self.latest_tag = latest_tag
         if not os.path.exists(os.path.join(DEST_DIR, '.gitdump', 'LATEST_TAG')):
             _init_meta_dir(head_dir)
         else:
             with open(os.path.join(DEST_DIR, '.gitdump', 'LATEST_TAG')) as f:
-                latest_tag = f.read()
-            if tags[-2] != latest_tag:
+                current = f.read()
+            if self.latest_tag != current:
                 _init_meta_dir(head_dir)
 
     def config(self, outdir, patchnum, revision_range=None):
@@ -161,14 +167,18 @@ class DumpGenerator(object):
             self.offset += 1
             pos += 1
             _output_progress(pos, total, name)
-        if commit_id == '':
-            return
-        if self.revision_range is None or self.revision_range[1] == 'HEAD':
-            with open(os.path.join(DEST_DIR, '.gitdump', 'DUMP_HEAD'),
-                      'wb') as dump_head:
-                dump_head.write(b'%s\t%d\n' % (commit_id, self.offset - 1))
+        self.latest_commit_id = commit_id
         _output_progress(pos, total)
         sys.stdout.write('\n')
+
+    def write_metadata(self):
+        """Writes out metadata."""
+        if self.latest_commit_id != b'':
+            with open(os.path.join(DEST_DIR, '.gitdump', 'DUMP_HEAD'), 'wb') as dump_head:
+                dump_head.write(b'%s\t%d\n' % (self.latest_commit_id, self.offset - 1))
+        if self.latest_tag != '':
+            with open(os.path.join(DEST_DIR, '.gitdump', 'LATEST_TAG'), 'w') as tag_file:
+                tag_file.write(self.latest_tag)
 
 
 def _get_tag():
@@ -328,7 +338,7 @@ def _check_linux_kernel():
 
     end = ''
     dump_generator = DumpGenerator(os.path.join(DEST_DIR, 'HEAD'))
-    dump_generator.check_new_tag(revs, os.path.join(DEST_DIR, 'HEAD'))
+    dump_generator.check_new_tag(revs[-2], os.path.join(DEST_DIR, 'HEAD'))
     for revision in revs:
         start = end
         end = revision
@@ -361,6 +371,7 @@ def _check_linux_kernel():
             dump_generator.dump(commit_list)
         else:
             LOGGER.info("Processing {0:10s} (up to date)".format(end))
+    dump_generator.write_metadata()
 
 
 def _check_git_repo():
@@ -381,6 +392,7 @@ def _check_git_repo():
         dump_generator.update_offset(offset)
     if commit_list != []:
         dump_generator.dump(commit_list)
+        dump_generator.write_metadata()
 
 
 if __name__ == "__main__":
