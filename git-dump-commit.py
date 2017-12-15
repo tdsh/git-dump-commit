@@ -37,6 +37,7 @@ or
 """
 
 
+import argparse
 import fnmatch
 import logging
 import os
@@ -181,24 +182,30 @@ class DumpGenerator(object):
                 tag_file.write(self.latest_tag)
 
 
-def _get_tag():
+def _get_tag(tag_name):
     """Helper function to look up linux kernel.
 
     This verifies tags via "git tag" by taggerdate order.
 
+    Args:
+        tag_name: a str representing pattern of tag name. This is passed to
+        "git tag".
     Returns:
         A tuple of
         - a list of str representing tag name.
     Raises:
         subprocess.CalledProcessError: an erro occurred in "git tag" command.
     """
+    args = ['git', 'tag', '--sort=taggerdate']
+    if tag_name != '':
+        args.extend(['-l', tag_name])
     try:
-        out = subprocess.check_output(['git', 'tag', '--sort=taggerdate'],
-                                      shell=False, stderr=subprocess.STDOUT)
+        out = subprocess.check_output(args, shell=False, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError:
         raise
     out = out.split()
-    out.append(b'HEAD')
+    if tag_name == '':
+        out.append(b'HEAD')
     return [i.decode('utf-8') for i in out]
 
 
@@ -324,14 +331,14 @@ def _fast_forward_commit_list(commit_list, head_dir):
     return (commit_list[index + 1:], offset + 1)
 
 
-def _check_linux_kernel():
+def _check_linux_kernel(tag_name):
     """Entry point in Linux kernel repo.
 
     It traverses linux kernel repository you're in
     and dumps all the commits of each tag.
     """
     try:
-        revs = _get_tag()
+        revs = _get_tag(tag_name)
     except subprocess.CalledProcessError as err:
         LOGGER.error('\n\n%s', err.output.decode('utf-8'))
         sys.exit(1)
@@ -404,8 +411,16 @@ if __name__ == "__main__":
         LOGGER.error('\n\n%s', err.output.decode('utf-8'))
         sys.exit(1)
 
-    if '-v' in sys.argv:
-        # verbose output
+    parser = argparse.ArgumentParser('git-dump-commit')
+    parser.add_argument('tag_name', action='store', nargs='?', default='', type=str,
+                        help='Tag which matches the pattern(s). '
+                        'The pattern is a shell wildcard (matched using fnmatch).',
+                        metavar=None)
+    parser.add_argument('-v', '--verbose', action='store_true', default=False,
+                        help='Verbose output.')
+    args = parser.parse_args()
+
+    if args.verbose is True:
         CH.setLevel(logging.DEBUG)
         LOGGER.setLevel(logging.DEBUG)
 
@@ -416,6 +431,6 @@ if __name__ == "__main__":
     repo = re.sub(r'''^(git|https)://''', '', repo.decode('utf-8'))
     repo = repo.rstrip('.git\n')
     if repo in LINUX_KERNEL_REPOS:
-        _check_linux_kernel()
+        _check_linux_kernel(args.tag_name)
     else:
         _check_git_repo()
