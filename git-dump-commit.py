@@ -27,12 +27,10 @@
 """
 git-dump-commit checks git branch where you're at currently
 and dumps all the commits in patch format to "DUMP-COMMIT" directory.
-If your repository is Linux kernel (torvalds/linux-2.6.git),
-it traverses all tags and dumps commits for each kernel version.
 
 Please run at git repository.
-# git-dump-commit
-or
+# git-dump-commit -a
+or it can put each commit file to directory of tag name.
 # git dump-commit
 """
 
@@ -53,13 +51,6 @@ LOGGER.setLevel(logging.INFO)
 LOGGER.addHandler(CH)
 
 DEST_DIR = "DUMP-COMMIT"
-LINUX_KERNEL_REPOS = [
-    'git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux',
-    'git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6',
-    'kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux',
-    'github.com/torvalds/linux',
-    'git@github.com:torvalds/linux'
-]
 
 
 def _output_progress(count, total, name=None):
@@ -331,11 +322,10 @@ def _fast_forward_commit_list(commit_list, head_dir):
     return (commit_list[index + 1:], offset + 1)
 
 
-def _check_linux_kernel(tag_name):
-    """Entry point in Linux kernel repo.
+def _dump_per_tag(tag_name):
+    """Dumps commits into directory named each tag.
 
-    It traverses linux kernel repository you're in
-    and dumps all the commits of each tag.
+    It traverses repository you're in and dumps all the commits of each tag.
     """
     try:
         revs = _get_tag(tag_name)
@@ -381,8 +371,8 @@ def _check_linux_kernel(tag_name):
     dump_generator.write_metadata()
 
 
-def _check_git_repo():
-    """Dump all the commits of current branch.
+def _dump_in_lump():
+    """Dump all the commits of current branch into one directory.
     """
     dump_generator = DumpGenerator(DEST_DIR)
     try:
@@ -404,20 +394,22 @@ def _check_git_repo():
 
 if __name__ == "__main__":
     # Check if you're in git repo.
-    try:
-        repo = subprocess.check_output(['git', 'config', 'remote.origin.url'],
-                                       shell=False, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as err:
-        LOGGER.error('\n\n%s', err.output.decode('utf-8'))
+    ret = subprocess.call(['git', 'status', '-uno'], shell=False,
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if ret != 0:
         sys.exit(1)
 
     parser = argparse.ArgumentParser('git-dump-commit')
-    parser.add_argument('tag_name', action='store', nargs='?', default='', type=str,
-                        help='Tag which matches the pattern(s). '
-                        'The pattern is a shell wildcard (matched using fnmatch).',
-                        metavar=None)
+    parser.add_argument('-a', '--all', action='store_true', default=False,
+                        help='Puts all the dumps into the one directory.')
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         help='Verbose output.')
+    parser.add_argument('tag_name', action='store', nargs='?', default='', type=str,
+                        help='Tag which matches the pattern(s). '
+                        'The pattern is a shell wildcard (matched using fnmatch). '
+                        "This option doesn't mean anything if -a option is used"
+                        'at the same time.',
+                        metavar=None)
     args = parser.parse_args()
 
     if args.verbose is True:
@@ -428,9 +420,7 @@ if __name__ == "__main__":
     if not os.path.exists(DEST_DIR):
         os.mkdir(DEST_DIR)
 
-    repo = re.sub(r'''^(git|https)://''', '', repo.decode('utf-8'))
-    repo = repo.rstrip('.git\n')
-    if repo in LINUX_KERNEL_REPOS:
-        _check_linux_kernel(args.tag_name)
+    if args.all is True:
+        _dump_in_lump()
     else:
-        _check_git_repo()
+        _dump_per_tag(args.tag_name)
