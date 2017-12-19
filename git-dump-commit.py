@@ -333,6 +333,12 @@ def _dump_per_tag(tag_name):
         LOGGER.error('\n\n%s', err.output.decode('utf-8'))
         sys.exit(1)
 
+    # Even without "-a", put all the dumps just in the directory if no tag is set.
+    revs_len = len(revs)
+    if revs_len == 0 or (revs_len == 1 and revs[0] == 'HEAD'):
+        _dump_in_lump()
+        sys.exit(0)
+
     end = ''
     dump_generator = DumpGenerator(os.path.join(DEST_DIR, 'HEAD'))
     dump_generator.check_new_tag(revs[-2], os.path.join(DEST_DIR, 'HEAD'))
