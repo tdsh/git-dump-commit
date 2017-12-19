@@ -240,8 +240,21 @@ def _setup_dump_dir(tag):
     rc_release = True
     if tag == 'HEAD':
         return (done, rc_release, '{0}/{1}'.format(DEST_DIR, tag))
-    version = tag.split('-')[0]
-    outdir = '{0}/{1}/{2}'.format(DEST_DIR, version, tag)
+    # If tag contains 'RC', 'rc', 'PRE', 'pre', 'BETA' or 'beta', the tag can
+    # be thought as release candidate for primary version.
+    # Create directory named tag under primary version directory in that case.
+    suffixes = ['rc', 'pre', 'beta', None]
+    for suffix_nom in suffixes:
+        if suffix_nom is None or suffix_nom in tag.lower():
+            break
+    suffix = suffix_nom
+    version = tag.lower().split(suffix)[0]
+    if version[-1] in ['-', '_', '.']:
+        version = version[:-1]
+    if version != tag:
+        outdir = '{0}/{1}/{2}'.format(DEST_DIR, version, tag)
+    else:
+        outdir = '{0}/{1}'.format(DEST_DIR, version)
     if not os.path.exists('{0}/{1}'.format(DEST_DIR, version)):
         os.makedirs(outdir)
     elif not os.path.exists(outdir):
