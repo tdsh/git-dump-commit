@@ -10,10 +10,10 @@ git-dump-commit is a git subcommand to to extract and dump all the git commits f
 Usage
 -----
 
-1. Put `git-dump-commit.py` at somewhere in your PATH.
+1. Put or make symbolic link `git-dump-commit.py` at somewhere in your PATH as `git-dump-commit`.
 
   ```shell
-  # mv git-dump-commit.py /usr/local/bin
+  # mv git-dump-commit.py /usr/local/bin/git-dump-commit
   ```
 
 1. Run `git dump-commit` at directory of git local repo. It has several options.
