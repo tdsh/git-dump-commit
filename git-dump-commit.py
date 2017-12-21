@@ -383,10 +383,13 @@ def _dump_per_tag(tag_name):
             LOGGER.info("Skipping {0:12s} (empty)".format(end))
             continue
         dump_generator.config(outdir, len(commit_list), [start, end])
-        try:
-            (commit_list, offset) = _fast_forward_commit_list(commit_list,
-                                                              os.path.join(DEST_DIR, 'HEAD'))
-        except (OSError, ValueError):
+        if end == 'HEAD':
+            try:
+                (commit_list, offset) = _fast_forward_commit_list(commit_list,
+                                                                  os.path.join(DEST_DIR, 'HEAD'))
+            except (OSError, ValueError):
+                offset = None
+        else:
             offset = None
         if offset:
             dump_generator.update_offset(offset)
