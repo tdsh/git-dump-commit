@@ -324,6 +324,14 @@ def _fast_forward_commit_list(commit_list, head_dir):
         # Mismatch of last commit ID in DUMP-COMMIT/.gitdump/DUMP_HEAD.
         raise OSError
 
+    # If last commit ID is same, it's possible that the other commits are
+    # merged before the last commit because it's chronological order.
+    # Dump again also in that case.
+    list_len = len(commit_list)
+    if offset != list_len:
+        _init_meta_dir(head_dir)
+        raise OSError
+
     try:
         index = commit_list.index(last_commit)
     except ValueError:
