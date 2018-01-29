@@ -251,10 +251,7 @@ def _setup_dump_dir(tag):
     version = tag.lower().split(suffix)[0]
     if version[-1] in ['-', '_', '.']:
         version = version[:-1]
-    if version != tag:
-        outdir = '{0}/{1}/{2}'.format(DEST_DIR, version, tag)
-    else:
-        outdir = '{0}/{1}'.format(DEST_DIR, version)
+    outdir = '{0}/{1}/{2}'.format(DEST_DIR, version, tag)
     if not os.path.exists('{0}/{1}'.format(DEST_DIR, version)):
         os.makedirs(outdir)
     elif not os.path.exists(outdir):
