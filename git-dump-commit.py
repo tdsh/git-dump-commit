@@ -43,6 +43,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 
 LOGGER = logging.getLogger(__name__)
 CH = logging.StreamHandler()
@@ -374,6 +375,7 @@ def _dump_per_tag(tag_name):
         (done, outdir) = _setup_dump_dir(end)
         if done:
             print_overwrite("Skipping {0:12s} (already done)".format(end))
+            time.sleep(0.002)
             continue
         try:
             commit_list = _get_commit_list(start, end)
