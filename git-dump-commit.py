@@ -243,13 +243,11 @@ def _setup_dump_dir(tag):
     Returns:
         A tuple of the following 3 elements.
         - bool. True if the directory exists already.
-        - bool. True if tag is RC version.
         - str of directory name
     """
     done = False
-    rc_release = True
     if tag == 'HEAD':
-        return (done, rc_release, '{0}/{1}'.format(DEST_DIR, tag))
+        return (done, '{0}/{1}'.format(DEST_DIR, tag))
     # If tag contains 'RC', 'rc', 'PRE', 'pre', 'BETA' or 'beta', the tag can
     # be thought as release candidate for primary version.
     # Create directory named tag under primary version directory in that case.
@@ -268,9 +266,7 @@ def _setup_dump_dir(tag):
         os.mkdir(outdir)
     else:
         done = True
-    if done is True and version == tag:
-        rc_release = False
-    return (done, rc_release, outdir)
+    return (done, outdir)
 
 
 def _init_meta_dir(head_dir):
@@ -375,10 +371,9 @@ def _dump_per_tag(tag_name):
         end = revision
         if start == '':
             continue
-        (done, rc_release, outdir) = _setup_dump_dir(end)
+        (done, outdir) = _setup_dump_dir(end)
         if done:
-            if not rc_release:
-                print_overwrite("Skipping {0:12s} (already done)".format(end))
+            print_overwrite("Skipping {0:12s} (already done)".format(end))
             continue
         try:
             commit_list = _get_commit_list(start, end)
