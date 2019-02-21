@@ -53,6 +53,17 @@ LOGGER.addHandler(CH)
 DEST_DIR = "DUMP-COMMIT"
 
 
+def print_overwrite(message):
+    """Output message with overwriting the existing line.
+
+    Args:
+        message: a str to output.
+    """
+    sys.stdout.write("\r{0}".format(message))
+    sys.stdout.flush()
+    return
+
+
 def _output_progress(count, total, name=None):
     """Outputs progress bar, percentage and the number of files dumped.
 
@@ -68,10 +79,9 @@ def _output_progress(count, total, name=None):
         percent = float(count) / total
         slugs = '#' * int(round(percent * 40))
         spaces = ' ' * (40 - len(slugs))
-        sys.stdout.write("\r[{bar}] {percent:>3}% ({count:>{digit}} / {total})".format(
+        print_overwrite("\r[{bar}] {percent:>3}% ({count:>{digit}} / {total})".format(
             bar=slugs + spaces, percent=int(round(percent * 100)),
             count=count, total=total, digit=len(str(total))))
-        sys.stdout.flush()
     return
 
 
@@ -368,7 +378,7 @@ def _dump_per_tag(tag_name):
         (done, rc_release, outdir) = _setup_dump_dir(end)
         if done:
             if not rc_release:
-                LOGGER.info("Skipping {0:12s} (already done)".format(end))
+                print_overwrite("Skipping {0:12s} (already done)".format(end))
             continue
         try:
             commit_list = _get_commit_list(start, end)
@@ -377,7 +387,7 @@ def _dump_per_tag(tag_name):
             sys.exit(1)
         if len(commit_list) == 1 and commit_list[0] == '':
             # empty version
-            LOGGER.info("Skipping {0:12s} (empty)".format(end))
+            LOGGER.info("\nSkipping {0:12s} (empty)".format(end))
             continue
         dump_generator.config(outdir, len(commit_list), [start, end])
         if end == 'HEAD':
@@ -391,10 +401,10 @@ def _dump_per_tag(tag_name):
         if offset:
             dump_generator.update_offset(offset)
         if commit_list != []:
-            LOGGER.info("Processing %s..%s", start, end)
+            LOGGER.info("\nProcessing %s..%s", start, end)
             dump_generator.dump(commit_list)
         else:
-            LOGGER.info("Processing {0:10s} (up to date)".format(end))
+            LOGGER.info("\nProcessing {0:10s} (up to date)".format(end))
     dump_generator.write_metadata()
 
 
